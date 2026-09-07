@@ -1,8 +1,8 @@
 import { Component, OnInit, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
-import { ApiService } from '../../../core/services/api.service';
-import { AuthStateService } from '../../../core/state/auth-state.service';
+import { ApiService } from 'src/app/services/api.service';
+import { AuthStateService } from 'src/app/core/state/auth-state.service';
 
 @Component({
   selector: 'app-hr-dashboard',
@@ -220,30 +220,13 @@ export class HrDashboardComponent implements OnInit {
 
   load() {
     this.api.post<any>('/v1/dashboard/hr-stats', {}).subscribe({
-      next: r => { if (r.success) { this.stats.set(r.data.stats); this.pendingLeaves.set(r.data.pendingLeaves ?? []); this.deptStats.set(r.data.deptStats ?? []); } },
-      error: () => this.loadDemoData()
+      next: (r: any) => { if (r && r.data) { this.stats.set(r.data.stats || {}); this.pendingLeaves.set(r.data.pendingLeaves ?? []); this.deptStats.set(r.data.deptStats ?? []); this.empStatus.set(r.data.empStatus ?? []); } },
+      error: () => {
+        this.stats.set({ totalEmployees: 0, presentToday: 0, absentToday: 0, onLeave: 0, lateArrivals: 0, earlyDepartures: 0, onTimeArrivals: 0, pendingLeaveApprovals: 0, monthlyPayroll: 0, newJoineesMonth: 0, exitingMonth: 0 });
+        this.pendingLeaves.set([]);
+        this.deptStats.set([]);
+        this.empStatus.set([]);
+      }
     });
-  }
-
-  loadDemoData() {
-    this.stats.set({ totalEmployees:142, presentToday:118, absentToday:8, onLeave:12, lateArrivals:14, earlyDepartures:6, onTimeArrivals:104, pendingLeaveApprovals:7, monthlyPayroll:2450000, newJoineesMonth:6, exitingMonth:2 });
-    this.pendingLeaves.set([
-      { id:1, initials:'RS', name:'Rahul Sharma',   leaveType:'Casual Leave', days:2, from:'05 Sep' },
-      { id:2, initials:'PK', name:'Priya Kapoor',   leaveType:'Sick Leave',   days:1, from:'06 Sep' },
-      { id:3, initials:'AM', name:'Amit Mehta',     leaveType:'Earned Leave', days:3, from:'07 Sep' },
-      { id:4, initials:'SJ', name:'Sunita Joshi',   leaveType:'Casual Leave', days:1, from:'08 Sep' },
-    ]);
-    this.deptStats.set([
-      { dept:'Engineering', count:42, pct:85 }, { dept:'Sales',      count:28, pct:56 },
-      { dept:'HR',          count:12, pct:24 }, { dept:'Finance',    count:18, pct:36 },
-      { dept:'Operations',  count:22, pct:44 }, { dept:'Support',    count:20, pct:40 },
-    ]);
-    this.empStatus.set([
-      { icon:'🟢', label:'Active',      count:128, badge:'badge-success' },
-      { icon:'🟡', label:'Probation',   count:  9, badge:'badge-warning' },
-      { icon:'🔵', label:'Confirmed',   count:119, badge:'badge-info'    },
-      { icon:'🔴', label:'Resigned',    count:  5, badge:'badge-danger'  },
-      { icon:'⚪', label:'Inactive',    count:  9, badge:'badge-warning' },
-    ]);
   }
 }

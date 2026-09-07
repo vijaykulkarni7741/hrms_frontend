@@ -2,8 +2,9 @@ import { Component, OnInit, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { ApiService } from '../../../core/services/api.service';
-import { ToastService } from '../../../core/services/toast.service';
+import { ApiService } from 'src/app/services/api.service';
+import { ToastService } from 'src/app/core/services/toast.service';
+import { HasPermissionDirective } from 'src/app/core/directives/has-permission.directive';
 
 export interface Employee {
   id: number;
@@ -30,7 +31,7 @@ export interface Employee {
 @Component({
   selector: 'app-employee-list',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule],
+  imports: [CommonModule, RouterModule, FormsModule, HasPermissionDirective],
   template: `
     <div class="page-container">
       <div class="page-header">
@@ -38,7 +39,7 @@ export interface Employee {
           <h2 class="page-title">👥 Employees</h2>
           <p class="page-subtitle">{{ total() }} total employees</p>
         </div>
-        <a class="btn btn-primary" routerLink="/employees/new" id="add-employee-btn">
+        <a *hasPermission="'EMP_CREATE'" class="btn btn-primary" routerLink="/employees/new" id="add-employee-btn">
           ➕ Add Employee
         </a>
       </div>
@@ -116,8 +117,8 @@ export interface Employee {
                     <td>
                       <div style="display:flex; gap:6px;">
                         <a class="btn btn-secondary btn-sm btn-icon" [routerLink]="['/employees', emp.id]" title="View" [id]="'view-emp-'+emp.id">👁️</a>
-                        <a class="btn btn-secondary btn-sm btn-icon" [routerLink]="['/employees', emp.id, 'edit']" title="Edit" [id]="'edit-emp-'+emp.id">✏️</a>
-                        <button class="btn btn-sm btn-icon" [class]="emp.isActive ? 'btn-danger' : 'btn-success'"
+                        <a *hasPermission="'EMP_EDIT'" class="btn btn-secondary btn-sm btn-icon" [routerLink]="['/employees', emp.id, 'edit']" title="Edit" [id]="'edit-emp-'+emp.id">✏️</a>
+                        <button *hasPermission="'EMP_DELETE'" class="btn btn-sm btn-icon" [class]="emp.isActive ? 'btn-danger' : 'btn-success'"
                                 (click)="toggleActive(emp)" [title]="emp.isActive ? 'Deactivate' : 'Activate'" [id]="'toggle-emp-'+emp.id">
                           {{ emp.isActive ? '🚫' : '✅' }}
                         </button>
@@ -182,9 +183,16 @@ export class EmployeeListComponent implements OnInit {
 
   load() {
     this.isLoading.set(true);
-    this.api.post<Employee[]>('/v1/employees/list', {}).subscribe({
-      next: (res) => {
-        const list = res.data ?? [];
+    const payload = {
+      page: this.page() - 1,
+      size: this.pageSize,
+      search: this.searchTerm,
+      status: this.filterStatus,
+      type: this.filterType
+    };
+    this.api.post<Employee[]>('/v1/employees/list', payload).subscribe({
+      next: (res: any) => {
+        const list = res?.data ?? res ?? [];
         this.employees.set(list);
         this.applyFilter();
         this.isLoading.set(false);

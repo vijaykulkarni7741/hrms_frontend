@@ -2,8 +2,8 @@ import { Component, OnInit, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { ApiService } from '../../../core/services/api.service';
-import { ToastService } from '../../../core/services/toast.service';
+import { ApiService } from 'src/app/services/api.service';
+import { ToastService } from 'src/app/core/services/toast.service';
 
 interface LeaveApplication {
   id: number;
@@ -157,14 +157,14 @@ export class MyLeavesComponent implements OnInit {
   load() {
     this.isLoading.set(true);
     this.api.post<LeaveApplication[]>('/v1/leave-applications/list', {}).subscribe({
-      next: r => { this.leaves.set(r.data ?? []); this.total.set(this.leaves().length); this.applyFilter(); this.isLoading.set(false); },
+      next: (r: any) => { this.leaves.set(r.data ?? []); this.total.set(this.leaves().length); this.applyFilter(); this.isLoading.set(false); },
       error: () => this.isLoading.set(false)
     });
   }
 
   loadLeaveTypes() {
     this.api.post<LeaveType[]>('/v1/leave-types/list', {}).subscribe({
-      next: r => this.leaveTypes.set(r.data ?? [])
+      next: (r: any) => this.leaveTypes.set(r.data ?? [])
     });
   }
 

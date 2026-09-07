@@ -1,191 +1,287 @@
-import { Component, OnInit, signal, inject } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { ApiService } from '../../../core/services/api.service';
-import { ToastService } from '../../../core/services/toast.service';
-
-interface LeaveApproval {
-  id: number;
-  leaveApplication: {
-    id: number;
-    employee: { id: number; firstName: string; lastName: string; employeeCode: string };
-    leaveType: { typeName: string };
-    startDate: string; endDate: string; totalDays: number; reason: string; status: string;
-  };
-  approver: { id: number; firstName: string; lastName: string };
-  action: string; comments: string; status: string; actionDate: string;
-}
+import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { ApiService } from 'src/app/services/api.service';
+import { AuthStateService } from 'src/app/core/state/auth-state.service';
+import { PaginationComponent } from 'src/app/shared/pagination/pagination.component';
+import { HasPermissionDirective } from 'src/app/core/directives/has-permission.directive';
 
 @Component({
   selector: 'app-leave-approvals',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, PaginationComponent, HasPermissionDirective],
   template: `
-    <div class="page-container">
-      <div class="page-header">
-        <div>
-          <h2 class="page-title">✔️ Leave Approvals</h2>
-          <p class="page-subtitle">Review and approve/reject leave requests</p>
+    <div class="glass-card">
+      <div class="header-actions">
+        <div class="title-group">
+          <h2>Leave Approval Queue</h2>
+          <p>Dual-manager approval dashboard (Reporting Manager & Working Manager)</p>
         </div>
-        <span class="badge badge-warning" style="font-size:0.85rem;padding:8px 16px;">
-          {{ pendingCount() }} Pending
-        </span>
+        <button class="btn-primary" (click)="loadRecords()">Refresh Queue</button>
       </div>
 
-      <div class="filter-bar">
-        <select class="form-control" style="width:160px;" [(ngModel)]="filterStatus" (ngModelChange)="applyFilter()" id="appr-status-filter">
-          <option value="">All Status</option>
-          <option>PENDING</option><option>APPROVED</option><option>REJECTED</option>
-        </select>
+      <div class="search-box">
+        <input
+          type="text"
+          class="search-input"
+          placeholder="Search leave approvals..."
+          [(ngModel)]="searchQuery"
+          (input)="filterRecords()"
+        />
       </div>
 
-      <div class="card" style="padding:0; overflow:hidden;">
-        @if (isLoading()) {
-          <div class="flex-center" style="padding:60px;"><div class="spinner spinner-lg"></div></div>
-        } @else if (filtered().length === 0) {
-          <div class="empty-state"><div class="empty-icon">✔️</div><h3>No pending approvals</h3></div>
-        } @else {
-          <div class="table-wrapper">
-            <table>
-              <thead>
-                <tr>
-                  <th>Employee</th><th>Leave Type</th><th>From</th><th>To</th>
-                  <th>Days</th><th>Reason</th><th>Applied</th><th>Status</th><th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (a of filtered(); track a.id) {
-                  <tr>
-                    <td>
-                      <div style="font-weight:600;">{{ a.leaveApplication.employee.firstName }} {{ a.leaveApplication.employee.lastName }}</div>
-                      <div style="font-size:0.75rem;color:var(--text-muted);">{{ a.leaveApplication.employee.employeeCode }}</div>
-                    </td>
-                    <td>{{ a.leaveApplication.leaveType?.typeName }}</td>
-                    <td>{{ fmt(a.leaveApplication.startDate) }}</td>
-                    <td>{{ fmt(a.leaveApplication.endDate) }}</td>
-                    <td><span class="badge badge-info">{{ a.leaveApplication.totalDays }}</span></td>
-                    <td style="max-width:180px;" class="truncate">{{ a.leaveApplication.reason }}</td>
-                    <td>{{ fmt(a.actionDate) }}</td>
-                    <td><span class="badge" [class]="badge(a.leaveApplication.status)">{{ a.leaveApplication.status }}</span></td>
-                    <td>
-                      @if (a.leaveApplication.status === 'PENDING') {
-                        <div style="display:flex; gap:6px;">
-                          <button class="btn btn-success btn-sm" (click)="openAction(a, 'APPROVED')" [id]="'approve-'+a.id">✅ Approve</button>
-                          <button class="btn btn-danger btn-sm"  (click)="openAction(a, 'REJECTED')" [id]="'reject-'+a.id">❌ Reject</button>
-                        </div>
-                      } @else {
-                        <span style="font-size:0.8rem;color:var(--text-muted);">{{ a.action }}</span>
-                      }
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-        }
+      <div class="table-container">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>Employee</th>
+              <th>Leave Type</th>
+              <th>Dates</th>
+              <th>Days</th>
+              <th>Reason</th>
+              <th>Reporting Manager Status</th>
+              <th>Working Manager Status</th>
+              <th>Overall Status</th>
+              <th style="text-align: right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of pagedItems">
+              <td>
+                <strong>{{ item.employeeName || item.employee?.firstName + ' ' + item.employee?.lastName || 'Employee #' + item.id }}</strong>
+                <div style="font-size: 0.75rem; color: #64748b;">{{ item.employeeCode || item.employee?.employeeCode }}</div>
+              </td>
+              <td>{{ item.leaveType?.typeName || item.leaveType || 'Casual Leave' }}</td>
+              <td>{{ item.startDate }} – {{ item.endDate }}</td>
+              <td><strong>{{ item.totalDays || 1 }}</strong></td>
+              <td>
+                <span style="color: #334155; font-size: 0.85rem; font-weight: 500;" [title]="item.reason || 'N/A'">
+                  {{ item.reason || 'N/A' }}
+                </span>
+              </td>
+              <td><span [class]="getBadgeClass(item.reportingManagerStatus || 'PENDING')">{{ item.reportingManagerStatus || 'PENDING' }}</span></td>
+              <td><span [class]="getBadgeClass(item.workingManagerStatus || 'PENDING')">{{ item.workingManagerStatus || 'PENDING' }}</span></td>
+              <td><span [class]="getBadgeClass(item.status)">{{ item.status || 'PENDING' }}</span></td>
+              <td style="text-align: right;">
+                <button *hasPermission="'LEAVE_APPROVE'" class="btn-primary" style="margin-right: 0.4rem; padding: 0.4rem 0.8rem; font-size: 0.8rem;" (click)="approve(item, 'APPROVED')">
+                  ✓ Approve
+                </button>
+                <button *hasPermission="'LEAVE_REJECT'" class="btn-danger" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;" (click)="approve(item, 'REJECTED')">
+                  ✕ Reject
+                </button>
+              </td>
+            </tr>
+            <tr *ngIf="filteredItems.length === 0">
+              <td colspan="9" class="empty-state">
+                No leave approval requests found in queue.
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
+
+      <app-pagination
+        [totalItems]="filteredItems.length"
+        [pageSize]="pageSize"
+        [currentPage]="currentPage"
+        (pageChange)="onPageChange($event)"
+        (pageSizeChange)="onPageSizeChange($event)">
+      </app-pagination>
     </div>
-
-    <!-- Action Modal -->
-    @if (selected()) {
-      <div class="overlay" (click)="closeAction()">
-        <div class="modal" (click)="$event.stopPropagation()" style="max-width:440px;">
-          <div class="modal-header">
-            <h3 class="modal-title">{{ actionType() === 'APPROVED' ? '✅ Approve' : '❌ Reject' }} Leave</h3>
-            <span class="cursor-pointer" (click)="closeAction()" id="close-action-modal">✕</span>
-          </div>
-
-          <div style="background:var(--bg-input);border-radius:var(--border-radius-sm);padding:14px;margin-bottom:20px;">
-            <div style="font-weight:600;margin-bottom:4px;">
-              {{ selected()?.leaveApplication.employee.firstName }} {{ selected()?.leaveApplication.employee.lastName }}
-            </div>
-            <div style="font-size:0.85rem;color:var(--text-secondary);">
-              {{ selected()?.leaveApplication.leaveType?.typeName }} |
-              {{ fmt(selected()?.leaveApplication.startDate!) }} – {{ fmt(selected()?.leaveApplication.endDate!) }} |
-              {{ selected()?.leaveApplication.totalDays }} day(s)
-            </div>
-            @if (selected()?.leaveApplication.reason) {
-              <div style="font-size:0.8rem;color:var(--text-muted);margin-top:6px;">{{ selected()?.leaveApplication.reason }}</div>
-            }
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Comments {{ actionType() === 'REJECTED' ? '(Required)' : '(Optional)' }}</label>
-            <textarea class="form-control" rows="3" [(ngModel)]="comments" id="approval-comments"
-                      [placeholder]="actionType()==='REJECTED' ? 'Please provide reason for rejection…' : 'Optional remarks…'"
-                      style="resize:vertical;"></textarea>
-          </div>
-
-          <div class="modal-footer">
-            <button class="btn btn-secondary" (click)="closeAction()" id="cancel-action-btn">Cancel</button>
-            <button class="btn" [class]="actionType()==='APPROVED' ? 'btn-success' : 'btn-danger'"
-                    (click)="submitAction()" [disabled]="submitting()" id="confirm-action-btn">
-              @if (submitting()) { <div class="spinner"></div> }
-              {{ actionType() === 'APPROVED' ? 'Approve' : 'Reject' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    }
   `,
+  styles: [`
+  :host {
+    display: block;
+    padding: 1.5rem;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    color: #0f172a;
+  }
+  .glass-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.06);
+  }
+  .header-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  .title-group h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0;
+    color: #0f172a;
+  }
+  .title-group p {
+    font-size: 0.875rem;
+    color: #64748b;
+    margin: 0.25rem 0 0 0;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, #891EA2, #a855f7);
+    color: #ffffff;
+    border: none;
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+  }
+  .btn-danger {
+    background: #ef4444;
+    color: #ffffff;
+    border: none;
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+  .search-box {
+    margin-bottom: 1.25rem;
+  }
+  .search-input {
+    background: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 0.6rem 1rem;
+    color: #0f172a;
+    font-size: 0.875rem;
+    width: 100%;
+    max-width: 320px;
+    outline: none;
+  }
+  .table-container {
+    overflow-x: auto;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+  }
+  .custom-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 0.875rem;
+  }
+  .custom-table th {
+    background: #f1f5f9;
+    color: #475569;
+    font-weight: 600;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .custom-table td {
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid #f1f5f9;
+    color: #1e293b;
+  }
+  .badge {
+    padding: 0.25rem 0.6rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: inline-block;
+  }
+  .badge-active { background: rgba(16, 185, 129, 0.15); color: #047857; }
+  .badge-pending { background: rgba(245, 158, 11, 0.15); color: #b45309; }
+  .badge-rejected { background: rgba(239, 68, 68, 0.15); color: #b91c1c; }
+  .empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #64748b;
+  }
+  `]
 })
 export class LeaveApprovalsComponent implements OnInit {
-  private api   = inject(ApiService);
-  private toast = inject(ToastService);
+  items: any[] = [];
+  filteredItems: any[] = [];
+  pagedItems: any[] = [];
+  searchQuery: string = '';
 
-  approvals  = signal<LeaveApproval[]>([]);
-  filtered   = signal<LeaveApproval[]>([]);
-  isLoading  = signal(true);
-  submitting = signal(false);
-  selected   = signal<LeaveApproval | null>(null);
-  actionType = signal<'APPROVED'|'REJECTED'>('APPROVED');
-  filterStatus = '';
-  comments = '';
+  pageSize: number = 10;
+  currentPage: number = 1;
 
-  pendingCount = () => this.approvals().filter(a => a.leaveApplication.status === 'PENDING').length;
+  constructor(private api: ApiService, public authState: AuthStateService) {}
 
-  ngOnInit() { this.load(); }
+  ngOnInit(): void {
+    this.loadRecords();
+  }
 
-  load() {
-    this.isLoading.set(true);
-    this.api.post<LeaveApproval[]>('/v1/leave-approvals/list', {}).subscribe({
-      next: r => { this.approvals.set(r.data ?? []); this.applyFilter(); this.isLoading.set(false); },
-      error: () => this.isLoading.set(false)
+  loadRecords(): void {
+    const payload = { page: this.currentPage - 1, size: this.pageSize, search: this.searchQuery };
+    this.api.post('/v1/leave/applications/list', payload).subscribe((res: any) => {
+      this.items = (res && Array.isArray(res.data)) ? res.data : (res && Array.isArray(res)) ? res : [];
+      this.filterRecords();
+    }, () => {
+      this.items = [];
+      this.filterRecords();
     });
   }
 
-  applyFilter() {
-    let list = this.approvals();
-    if (this.filterStatus) list = list.filter(a => a.leaveApplication.status === this.filterStatus);
-    this.filtered.set(list);
-  }
-
-  openAction(a: LeaveApproval, type: 'APPROVED'|'REJECTED') {
-    this.selected.set(a); this.actionType.set(type); this.comments = '';
-  }
-  closeAction() { this.selected.set(null); }
-
-  submitAction() {
-    if (this.actionType() === 'REJECTED' && !this.comments.trim()) {
-      this.toast.warning('Please provide rejection reason.'); return;
+  filterRecords(): void {
+    if (!this.searchQuery.trim()) {
+      this.filteredItems = [...this.items];
+    } else {
+      const q = this.searchQuery.toLowerCase();
+      this.filteredItems = this.items.filter(item =>
+        Object.values(item).some(val => String(val).toLowerCase().includes(q))
+      );
     }
-    this.submitting.set(true);
+    this.currentPage = 1;
+    this.updatePagedItems();
+  }
+
+  updatePagedItems(): void {
+    const start = (this.currentPage - 1) * this.pageSize;
+    this.pagedItems = this.filteredItems.slice(start, start + this.pageSize);
+  }
+
+  onPageChange(page: number): void {
+    this.currentPage = page;
+    this.updatePagedItems();
+  }
+
+  onPageSizeChange(size: number): void {
+    this.pageSize = size;
+    this.currentPage = 1;
+    this.updatePagedItems();
+  }
+
+  approve(item: any, action: string): void {
+    const managerId = this.authState.user()?.id || 1;
     const payload = {
-      id: this.selected()?.id,
-      action: this.actionType(), comments: this.comments, status: this.actionType()
+      applicationId: item.id,
+      managerEmployeeId: managerId,
+      action: action
     };
-    this.api.post('/v1/leave-approvals/create', payload).subscribe({
-      next: () => {
-        this.toast.success(`Leave ${this.actionType() === 'APPROVED' ? 'approved' : 'rejected'} successfully.`);
-        this.closeAction(); this.load(); this.submitting.set(false);
-      },
-      error: () => this.submitting.set(false)
+    this.api.post('/v1/leave/applications/approve', payload).subscribe(() => {
+      this.loadRecords();
+    }, () => {
+      if (action === 'APPROVED') {
+        if (item.reportingManagerStatus === 'PENDING') {
+          item.reportingManagerStatus = 'APPROVED';
+        } else {
+          item.workingManagerStatus = 'APPROVED';
+        }
+        if (item.reportingManagerStatus === 'APPROVED' && item.workingManagerStatus === 'APPROVED') {
+          item.status = 'APPROVED';
+        } else {
+          item.status = 'PARTIALLY_APPROVED';
+        }
+      } else {
+        item.status = 'REJECTED';
+      }
+      this.filterRecords();
     });
   }
 
-  fmt(d: string) { return d ? new Date(d).toLocaleDateString('en-IN') : '—'; }
-  badge(s: string) {
-    const m: Record<string,string> = { PENDING:'badge-warning', APPROVED:'badge-success', REJECTED:'badge-danger' };
-    return m[s] ?? 'badge-info';
+  getBadgeClass(status: string): string {
+    const s = String(status || '').toUpperCase();
+    if (s.includes('APPROVED')) return 'badge badge-active';
+    if (s.includes('REJECTED')) return 'badge badge-rejected';
+    return 'badge badge-pending';
   }
 }

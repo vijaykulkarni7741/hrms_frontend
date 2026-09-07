@@ -1,8 +1,8 @@
 import { Component, OnInit, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ApiService } from '../../../core/services/api.service';
-import { ToastService } from '../../../core/services/toast.service';
+import { ApiService } from 'src/app/services/api.service';
+import { ToastService } from 'src/app/core/services/toast.service';
 
 interface SalarySlip {
   id: number;
@@ -101,11 +101,11 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
             <div class="grid grid-2" style="gap:12px;">
               <div>
                 <div class="form-label">Employee Name</div>
-                <div style="font-weight:600;">{{ selectedSlip()?.employee.firstName }} {{ selectedSlip()?.employee.lastName }}</div>
+                <div style="font-weight:600;">{{ selectedSlip()?.employee?.firstName }} {{ selectedSlip()?.employee?.lastName }}</div>
               </div>
               <div>
                 <div class="form-label">Employee Code</div>
-                <div style="font-weight:600;">{{ selectedSlip()?.employee.employeeCode }}</div>
+                <div style="font-weight:600;">{{ selectedSlip()?.employee?.employeeCode }}</div>
               </div>
               <div>
                 <div class="form-label">Slip Number</div>
@@ -147,7 +147,7 @@ export class SalarySlipsComponent implements OnInit {
   load() {
     this.isLoading.set(true);
     this.api.post<SalarySlip[]>('/v1/salary-slips/list', {}).subscribe({
-      next: r => { this.slips.set(r.data ?? []); this.applyFilter(); this.isLoading.set(false); },
+      next: (r: any) => { this.slips.set(r.data ?? []); this.applyFilter(); this.isLoading.set(false); },
       error: () => this.isLoading.set(false)
     });
   }

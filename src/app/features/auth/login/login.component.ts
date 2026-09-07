@@ -2,10 +2,10 @@ import { Component, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { ApiService } from '../../core/services/api.service';
-import { AuthStateService } from '../../core/state/auth-state.service';
-import { ToastService } from '../../core/services/toast.service';
-import { ToastComponent } from '../../shared/toast/toast.component';
+import { ApiService } from 'src/app/services/api.service';
+import { AuthStateService } from 'src/app/core/state/auth-state.service';
+import { ToastService } from 'src/app/core/services/toast.service';
+import { ToastComponent } from 'src/app/shared/toast/toast.component';
 
 @Component({
   selector: 'app-login',
@@ -79,7 +79,7 @@ import { ToastComponent } from '../../shared/toast/toast.component';
                   autocomplete="current-password"
                   [disabled]="isLoading()"
                 />
-                <button type="button" class="pwd-toggle" (click)="showPwd.update(v => !v)" id="pwd-toggle-btn" tabindex="-1">
+                <button type="button" class="pwd-toggle" (click)="togglePwd()" id="pwd-toggle-btn" tabindex="-1">
                   {{ showPwd() ? '🙈' : '👁️' }}
                 </button>
               </div>
@@ -204,6 +204,10 @@ export class LoginComponent {
   errorMsg   = signal('');
   loadingMsg = signal('Signing in…');
 
+  togglePwd(): void {
+    this.showPwd.update(v => !v);
+  }
+
   onLogin(): void {
     this.errorMsg.set('');
     if (!this.cred.employeeIdentifier?.trim() || !this.cred.password?.trim()) {
@@ -215,11 +219,11 @@ export class LoginComponent {
     this.loadingMsg.set('Signing in…');
 
     // ── Step 1: Login → get token + sessionId ─────────────────
-    this.api.post<{ token: string; sessionId: string; tokenType: string; expiresIn: number }>(
+    this.api.post<any>(
       '/v1/auth/login',
       { employeeIdentifier: this.cred.employeeIdentifier.trim(), password: this.cred.password }
     ).subscribe({
-      next: (res) => {
+      next: (res: any) => {
         if (!res.success || !res.data?.token) {
           this.errorMsg.set(res.message || 'Login failed. Please try again.');
           this.isLoading.set(false);
@@ -228,7 +232,7 @@ export class LoginComponent {
 
         const { token, sessionId } = res.data;
 
-        // Store token and sessionId (NO sessionStorage — only localStorage via AuthStateService)
+        // Store token and sessionId in sessionStorage via AuthStateService
         this.authState.setToken(token, sessionId);
         this.loadingMsg.set('Loading your profile…');
 

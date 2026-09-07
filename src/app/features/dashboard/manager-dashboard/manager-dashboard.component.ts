@@ -1,8 +1,8 @@
 import { Component, OnInit, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
-import { ApiService } from '../../../core/services/api.service';
-import { AuthStateService } from '../../../core/state/auth-state.service';
+import { ApiService } from 'src/app/services/api.service';
+import { AuthStateService } from 'src/app/core/state/auth-state.service';
 
 @Component({
   selector: 'app-manager-dashboard',
@@ -224,29 +224,14 @@ export class ManagerDashboardComponent implements OnInit {
   ngOnInit() { this.load(); }
   load() {
     this.api.post<any>('/v1/dashboard/manager-stats', {}).subscribe({
-      next: r => { if (r.success) { this.stats.set(r.data.stats); this.teamMembers.set(r.data.team ?? []); this.leaveRequests.set(r.data.pendingLeaves ?? []); } },
-      error: () => this.loadDemo()
+      next: (r: any) => { if (r && r.data) { this.stats.set(r.data.stats || {}); this.teamMembers.set(r.data.team ?? []); this.leaveRequests.set(r.data.pendingLeaves ?? []); } },
+      error: () => {
+        this.stats.set({ teamSize: 0, teamPresent: 0, teamAbsent: 0, pendingLeaves: 0, lateToday: 0, earlyDepartures: 0, overtimeCount: 0, avgHours: 0, earliestIn: '—', latestIn: '—' });
+        this.teamMembers.set([]);
+        this.leaveRequests.set([]);
+        this.onLeaveThisWeek.set([]);
+      }
     });
-  }
-  loadDemo() {
-    this.stats.set({ teamSize:12, teamPresent:10, teamAbsent:1, pendingLeaves:3, lateToday:2, earlyDepartures:1, overtimeCount:3, avgHours:8.4, earliestIn:'08:14', latestIn:'10:32' });
-    this.teamMembers.set([
-      { id:1, initials:'RS', name:'Rahul Sharma',  designation:'Sr. Developer',   status:'PRESENT', inTime:'09:05', isLate:false, isEarlyDep:false },
-      { id:2, initials:'PK', name:'Priya Kapoor',  designation:'Developer',        status:'PRESENT', inTime:'10:32', isLate:true,  isEarlyDep:false },
-      { id:3, initials:'AM', name:'Amit Mehta',    designation:'QA Engineer',      status:'LEAVE',   inTime:'',      isLate:false, isEarlyDep:false },
-      { id:4, initials:'SJ', name:'Sunita Joshi',  designation:'UI Designer',      status:'PRESENT', inTime:'08:55', isLate:false, isEarlyDep:true  },
-      { id:5, initials:'VR', name:'Vikram Rao',    designation:'Tech Lead',        status:'PRESENT', inTime:'09:00', isLate:false, isEarlyDep:false },
-      { id:6, initials:'NK', name:'Neha Kapoor',   designation:'Business Analyst', status:'ABSENT',  inTime:'',      isLate:false, isEarlyDep:false },
-    ]);
-    this.leaveRequests.set([
-      { id:1, empName:'Rahul Sharma', leaveType:'Casual Leave', from:'07 Sep', to:'08 Sep', days:2, reason:'Family function' },
-      { id:2, empName:'Neha Kapoor',  leaveType:'Sick Leave',   from:'06 Sep', to:'06 Sep', days:1, reason:'Not feeling well' },
-      { id:3, empName:'Priya Kapoor', leaveType:'Earned Leave', from:'10 Sep', to:'12 Sep', days:3, reason:'Travel plan' },
-    ]);
-    this.onLeaveThisWeek.set([
-      { id:1, initials:'AM', name:'Amit Mehta',  from:'05 Sep', to:'07 Sep', leaveType:'CL' },
-      { id:2, initials:'DG', name:'Deepak Gupta',from:'06 Sep', to:'06 Sep', leaveType:'SL' },
-    ]);
   }
   attBadge(s: string) {
     const m: Record<string,string> = { PRESENT:'badge-success', ABSENT:'badge-danger', LEAVE:'badge-warning', HALF_DAY:'badge-info' };

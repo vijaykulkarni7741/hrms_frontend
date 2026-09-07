@@ -1,0 +1,57 @@
+/* Global design system */
+:root {
+  --primary-color: #891EA2; /* vibrant primary */
+  --primary-hover: #6f1e86;
+  --bg-glass: rgba(255,255,255,0.15);
+  --text-primary: #212121;
+  --text-muted: #666666;
+  --border-radius: 12px;
+  --shadow-card: 0 8px 32px rgba(0,0,0,0.12);
+  --transition: all 0.3s ease;
+}
+
+/* Import Inter font */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
+  color: var(--text-primary);
+  margin: 0;
+  padding: 0;
+}
+
+/* Glass‑morphism card helper */
+.glass-card {
+  background: var(--bg-glass);
+  backdrop-filter: blur(12px);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-card);
+  padding: 2rem;
+  margin: 1rem auto;
+  max-width: 560px;
+}
+
+button {
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.primary-btn {
+  background: var(--primary-color);
+  color: #fff;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 4px;
+}
+.primary-btn:hover { background: var(--primary-hover); }
+
+.secondary-btn {
+  background: transparent;
+  color: var(--primary-color);
+  border: 1px solid var(--primary-color);
+  padding: 0.6rem 1.2rem;
+  border-radius: 4px;
+}
+
+.error { color: #e53935; font-size: 0.85rem; }

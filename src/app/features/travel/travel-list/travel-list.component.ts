@@ -1,8 +1,8 @@
 import { Component, OnInit, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ApiService } from '../../../core/services/api.service';
-import { ToastService } from '../../../core/services/toast.service';
+import { ApiService } from 'src/app/services/api.service';
+import { ToastService } from 'src/app/core/services/toast.service';
 
 interface TravelRequest {
   id: number;
@@ -138,7 +138,7 @@ export class TravelListComponent implements OnInit {
   load() {
     this.isLoading.set(true);
     this.api.post<TravelRequest[]>('/v1/travel-requests/list', {}).subscribe({
-      next: r => { this.requests.set(r.data??[]); this.applyFilter(); this.isLoading.set(false); },
+      next: (r: any) => { this.requests.set(r.data??[]); this.applyFilter(); this.isLoading.set(false); },
       error: () => this.isLoading.set(false)
     });
   }

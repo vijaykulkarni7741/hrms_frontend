@@ -1,8 +1,8 @@
 import { Component, OnInit, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
-import { ApiService } from '../../../core/services/api.service';
-import { AuthStateService } from '../../../core/state/auth-state.service';
+import { ApiService } from 'src/app/services/api.service';
+import { AuthStateService } from 'src/app/core/state/auth-state.service';
 
 @Component({
   selector: 'app-ceo-dashboard',
@@ -21,7 +21,7 @@ import { AuthStateService } from '../../../core/state/auth-state.service';
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
           <span class="badge badge-success" style="padding:7px 14px;">● Live</span>
-          <span class="badge badge-primary" style="padding:7px 14px;">{{ authState.organizationName }}</span>
+          <span class="badge badge-primary" style="padding:7px 14px;">{{ organizationName }}</span>
         </div>
       </div>
 
@@ -250,21 +250,9 @@ export class CeoDashboardComponent implements OnInit {
     newJoinees: 0, exits: 0, onProbation: 0,
   });
 
-  deptStats = signal([
-    { name:'Engineering', count: 42, pct: 85 },
-    { name:'Sales',       count: 28, pct: 56 },
-    { name:'HR',          count: 12, pct: 24 },
-    { name:'Finance',     count: 18, pct: 36 },
-    { name:'Operations',  count: 22, pct: 44 },
-  ]);
+  deptStats = signal<{ name: string; count: number; pct: number }[]>([]);
 
-  leaveTypes = signal([
-    { name:'Casual Leave',   count: 14, icon:'🌴', color:'var(--success)' },
-    { name:'Sick Leave',     count:  9, icon:'🏥', color:'var(--danger)'  },
-    { name:'Earned Leave',   count:  6, icon:'✈️', color:'var(--info)'    },
-    { name:'Comp Off',       count:  4, icon:'🔄', color:'var(--warning)' },
-    { name:'Maternity/Pat.', count:  2, icon:'👶', color:'var(--primary)' },
-  ]);
+  leaveTypes = signal<{ name: string; icon: string; color: string; count: number }[]>([]);
 
   get organizationName() { return this.authState.user()?.organizationName ?? ''; }
 
@@ -283,25 +271,22 @@ export class CeoDashboardComponent implements OnInit {
 
   loadKpis() {
     this.api.post<any>('/v1/dashboard/ceo-stats', {}).subscribe({
-      next: r => {
-        if (r.success) this.kpi.set(r.data);
+      next: (r: any) => {
+        if (r && r.data) {
+          this.kpi.set(r.data);
+          if (r.data.deptStats) this.deptStats.set(r.data.deptStats);
+          if (r.data.leaveTypes) this.leaveTypes.set(r.data.leaveTypes);
+        }
       },
       error: () => {
-        // Fallback demo data
         this.kpi.set({
-          totalEmployees: 142, presentToday: 118, onLeave: 12, absent: 8, remote: 4,
-          pendingApprovals: 19, pendingLeaves: 7, pendingTravel: 5, pendingExpenses: 4, pendingWorkflows: 3,
-          monthlyPayroll: 24500000, attendancePct: 83, totalDepartments: 8, attritionRate: 4.2,
-          newJoinees: 6, exits: 2, onProbation: 9,
+          totalEmployees: 0, presentToday: 0, onLeave: 0, absent: 0, remote: 0,
+          pendingApprovals: 0, pendingLeaves: 0, pendingTravel: 0, pendingExpenses: 0, pendingWorkflows: 0,
+          monthlyPayroll: 0, attendancePct: 0, totalDepartments: 0, attritionRate: 0,
+          newJoinees: 0, exits: 0, onProbation: 0,
         });
-        this.deptStats.set([
-          { name:'Engineering', count: 42, pct: 85 },
-          { name:'Sales',       count: 28, pct: 56 },
-          { name:'HR',          count: 12, pct: 24 },
-          { name:'Finance',     count: 18, pct: 36 },
-          { name:'Operations',  count: 22, pct: 44 },
-          { name:'Support',     count: 20, pct: 40 },
-        ]);
+        this.deptStats.set([]);
+        this.leaveTypes.set([]);
       }
     });
   }

@@ -2,8 +2,9 @@ import { Component, OnInit, signal, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
-import { AuthStateService } from '../../core/state/auth-state.service';
-import { MENU_ITEMS, MenuItem } from '../../core/config/menu.config';
+import { AuthStateService } from 'src/app/core/state/auth-state.service';
+import { MENU_ITEMS, MenuItem } from 'src/app/core/config/menu.config';
+import { LayoutService } from 'src/app/core/services/layout.service';
 
 @Component({
   selector: 'app-sidebar',
@@ -11,16 +12,17 @@ import { MENU_ITEMS, MenuItem } from '../../core/config/menu.config';
   imports: [CommonModule, RouterModule],
   template: `
     <aside class="sidebar" [class.collapsed]="collapsed()">
-
-      <!-- Brand -->
-      <div class="sidebar-brand">
-        <div class="brand-logo">H</div>
-        @if (!collapsed()) {
-          <div class="brand-text">
-            <span class="brand-name">HRMS</span>
-            <span class="brand-tagline">Portal</span>
-          </div>
-        }
+      <!-- Header / Logo section -->
+      <div class="sidebar-header">
+        <div class="brand-info" *ngIf="!collapsed()">
+          <img *ngIf="orgLogo" [src]="orgLogo" class="brand-logo-img" alt="Organization Logo" />
+          <span *ngIf="!orgLogo" class="brand-logo">🏢</span>
+          <span class="brand-title" [title]="orgName">{{ orgName }}</span>
+        </div>
+        <div class="brand-logo-collapsed" *ngIf="collapsed()">
+          <img *ngIf="orgLogo" [src]="orgLogo" class="brand-logo-img-sm" alt="Logo" />
+          <span *ngIf="!orgLogo">🏢</span>
+        </div>
       </div>
 
       <!-- Navigation -->
@@ -74,30 +76,16 @@ import { MENU_ITEMS, MenuItem } from '../../core/config/menu.config';
           </div>
         }
       </nav>
-
-      <!-- User Profile at bottom -->
-      <div class="sidebar-footer">
-        <div class="sidebar-user">
-          <div class="user-avatar">{{ initials() }}</div>
-          @if (!collapsed()) {
-            <div class="user-info">
-              <span class="user-name">{{ authState.user()?.fullName }}</span>
-              <span class="user-role">{{ authState.user()?.role }}</span>
-            </div>
-          }
-        </div>
-      </div>
-
-      <!-- Collapse toggle -->
-      <button class="collapse-btn" (click)="toggleCollapse()" [title]="collapsed() ? 'Expand' : 'Collapse'">
-        {{ collapsed() ? '›' : '‹' }}
-      </button>
     </aside>
   `,
   styles: [`
+    :host {
+      position: relative;
+      z-index: 200;
+    }
     .sidebar {
       width: var(--sidebar-width);
-      min-height: 100vh;
+      height: 100vh;
       background: var(--bg-sidebar);
       border-right: 1px solid var(--border);
       display: flex;
@@ -106,35 +94,65 @@ import { MENU_ITEMS, MenuItem } from '../../core/config/menu.config';
       left: 0; top: 0; bottom: 0;
       z-index: 200;
       transition: width var(--transition);
+      box-shadow: 2px 0 12px rgba(0,0,0,0.04);
       overflow: hidden;
     }
     .sidebar.collapsed { width: var(--sidebar-collapsed); }
 
-    /* Brand */
-    .sidebar-brand {
+    .sidebar-header {
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 20px 16px;
+      justify-content: flex-start;
+      padding: 0 1rem;
       border-bottom: 1px solid var(--border);
-      min-height: var(--topbar-height);
+      height: var(--topbar-height);
     }
-    .brand-logo {
-      width: 36px; height: 36px;
-      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-      border-radius: 10px;
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 800; font-size: 1.1rem; color: #fff;
+    .brand-info {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-weight: 800;
+      font-size: 0.95rem;
+      color: var(--primary);
+      overflow: hidden;
+    }
+    .brand-logo { font-size: 1.25rem; flex-shrink: 0; }
+    .brand-logo-img {
+      width: 32px; height: 32px;
+      border-radius: 6px;
+      object-fit: contain;
       flex-shrink: 0;
-      box-shadow: var(--shadow-glow);
     }
-    .brand-name { display: block; font-weight: 700; font-size: 1rem; color: var(--text-primary); }
-    .brand-tagline { display: block; font-size: 0.7rem; color: var(--text-muted); }
+    .brand-logo-img-sm {
+      width: 28px; height: 28px;
+      border-radius: 6px;
+      object-fit: contain;
+      margin: 0 auto;
+    }
+    .brand-logo-collapsed { font-size: 1.35rem; margin: 0 auto; display: flex; align-items: center; justify-content: center; }
+    .brand-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 165px; font-weight: 800; color: #891EA2; }
+
+    .header-toggle-btn {
+      background: var(--primary-subtle);
+      color: var(--primary);
+      border: 1px solid var(--border);
+      border-radius: var(--border-radius-sm);
+      width: 32px; height: 32px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; font-size: 0.85rem; font-weight: 800;
+      transition: all var(--transition);
+      margin: 0 auto;
+    }
+    .header-toggle-btn:hover {
+      background: var(--primary);
+      color: #ffffff;
+    }
 
     /* Nav */
     .sidebar-nav {
       flex: 1;
       overflow-y: auto;
+      overflow-x: hidden;
       padding: 12px 8px;
       scrollbar-width: thin;
     }
@@ -193,54 +211,44 @@ import { MENU_ITEMS, MenuItem } from '../../core/config/menu.config';
     .nav-child.active { color: var(--primary-light); font-weight: 500; }
     .child-icon { font-size: 0.85rem; opacity: 0.7; flex-shrink: 0; }
 
-    /* Footer */
-    .sidebar-footer {
-      padding: 12px 8px;
-      border-top: 1px solid var(--border);
-    }
-    .sidebar-user {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px;
-      border-radius: var(--border-radius-sm);
-    }
-    .user-avatar {
-      width: 34px; height: 34px;
-      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-      border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 700; font-size: 0.8rem; color: #fff;
-      flex-shrink: 0;
-    }
-    .user-name  { display: block; font-size: 0.82rem; font-weight: 600; color: var(--text-primary); }
-    .user-role  { display: block; font-size: 0.7rem; color: var(--text-muted); }
-
-    /* Collapse btn */
+    /* Edge Floating Collapse btn */
     .collapse-btn {
       position: absolute;
-      right: -12px; top: 50%;
+      right: -14px; top: 50%;
       transform: translateY(-50%);
-      width: 24px; height: 24px;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
+      width: 28px; height: 28px;
+      background: #891EA2;
+      border: 2px solid #ffffff;
       border-radius: 50%;
       cursor: pointer;
       display: flex; align-items: center; justify-content: center;
-      font-size: 0.9rem;
-      color: var(--text-secondary);
-      z-index: 201;
+      font-size: 1.1rem; font-weight: 800;
+      color: #ffffff;
+      z-index: 300;
+      box-shadow: 0 4px 12px rgba(137, 30, 162, 0.4);
       transition: all var(--transition);
     }
-    .collapse-btn:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .collapse-btn:hover { transform: translateY(-50%) scale(1.2); background: #731788; }
   `]
 })
 export class SidebarComponent implements OnInit {
 
   authState = inject(AuthStateService);
+  layout = inject(LayoutService);
   private router = inject(Router);
 
-  collapsed  = signal(false);
+  get user() { return this.authState.user(); }
+
+  get orgLogo(): string | null {
+    const u = this.user as any;
+    return u?.unitLogo || u?.organizationLogo || u?.companyLogo || null;
+  }
+
+  get orgName(): string {
+    return this.user?.unitName || this.user?.organizationName || 'HRMS Portal';
+  }
+
+  get collapsed() { return this.layout.sidebarCollapsed; }
   openGroups = signal<Set<string>>(new Set());
 
   filteredMenu = computed(() => {
@@ -255,7 +263,6 @@ export class SidebarComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    // Auto-open group for active route
     this.router.events
       .pipe(filter(e => e instanceof NavigationEnd))
       .subscribe(() => this._openActiveGroup());
@@ -263,7 +270,7 @@ export class SidebarComponent implements OnInit {
   }
 
   toggleCollapse(): void {
-    this.collapsed.update(v => !v);
+    this.layout.toggleSidebar();
   }
 
   toggleGroup(id: string): void {
@@ -297,14 +304,15 @@ export class SidebarComponent implements OnInit {
   }
 
   private _canSeeItem(item: MenuItem, user: any): boolean {
-    if (item.permission && !this.authState.hasPermission(item.permission)) {
-      // Also allow if has child permissions
-      if (item.children) {
-        return item.children.some(c => !c.permission || this.authState.hasPermission(c.permission));
-      }
-      return false;
+    if (item.roles && item.roles.length > 0) {
+      const uRole = (user.role || user.roleName || user.roleCode || user.status || '').toUpperCase();
+      const match = item.roles.some(r => uRole.includes(r.toUpperCase()) || this.authState.hasRole(r));
+      if (!match) return false;
     }
-    if (item.roles && !item.roles.some(r => this.authState.hasRole(r))) {
+    if (item.permission && !this.authState.hasPermission(item.permission)) {
+      if (item.children) {
+        return item.children.some(c => this._canSeeItem(c, user));
+      }
       return false;
     }
     return true;

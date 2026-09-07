@@ -1,156 +1,439 @@
-import { Component, OnInit, signal, inject } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { ApiService } from '../../../core/services/api.service';
-import { ToastService } from '../../../core/services/toast.service';
-
-interface SalaryComponent {
-  id: number; componentName: string; componentType: string;
-  calculationType: string; description: string; status: string; isActive: boolean;
-}
+import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { ApiService } from 'src/app/services/api.service';
 
 @Component({
   selector: 'app-salary-components',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule],
   template: `
-    <div class="page-container">
-      <div class="page-header">
-        <div>
-          <h2 class="page-title">🔧 Salary Components</h2>
-          <p class="page-subtitle">Manage earnings and deduction components</p>
+    <div class="glass-card">
+      <div class="header-actions">
+        <div class="title-group">
+          <h2>Salary Components</h2>
+          <p>Earnings and deduction rule definitions</p>
         </div>
-        <button class="btn btn-primary" (click)="openModal()" id="add-component-btn">➕ Add Component</button>
+        <button class="btn-primary" (click)="openAddModal()">
+          <span>+</span> Add New
+        </button>
       </div>
 
-      <div class="filter-bar">
-        <select class="form-control" style="width:160px;" [(ngModel)]="filterType" (ngModelChange)="applyFilter()" id="comp-type-filter">
-          <option value="">All Types</option><option>EARNING</option><option>DEDUCTION</option>
-        </select>
+      <div class="search-box">
+        <input
+          type="text"
+          class="search-input"
+          placeholder="Search records..."
+          [(ngModel)]="searchQuery"
+          (input)="filterRecords()"
+        />
+        <button class="btn-secondary" (click)="loadRecords()">Refresh</button>
       </div>
 
-      <div class="card" style="padding:0;overflow:hidden;">
-        @if (isLoading()) { <div class="flex-center" style="padding:60px;"><div class="spinner spinner-lg"></div></div>
-        } @else if (filtered().length === 0) {
-          <div class="empty-state"><div class="empty-icon">🔧</div><h3>No components found</h3></div>
-        } @else {
-          <div class="table-wrapper">
-            <table>
-              <thead><tr><th>Component Name</th><th>Type</th><th>Calc Type</th><th>Description</th><th>Status</th><th>Active</th><th>Actions</th></tr></thead>
-              <tbody>
-                @for (c of filtered(); track c.id) {
-                  <tr>
-                    <td><strong>{{ c.componentName }}</strong></td>
-                    <td><span class="badge" [class]="c.componentType==='EARNING' ? 'badge-success' : 'badge-danger'">{{ c.componentType }}</span></td>
-                    <td><span class="badge badge-info">{{ c.calculationType }}</span></td>
-                    <td>{{ c.description || '—' }}</td>
-                    <td><span class="badge" [class]="c.status==='ACTIVE'?'badge-success':'badge-warning'">{{ c.status }}</span></td>
-                    <td><span class="badge" [class]="c.isActive?'badge-success':'badge-danger'">{{ c.isActive ? 'Yes' : 'No' }}</span></td>
-                    <td>
-                      <div style="display:flex;gap:6px;">
-                        <button class="btn btn-secondary btn-sm btn-icon" (click)="openModal(c)" [id]="'edit-comp-'+c.id" title="Edit">✏️</button>
-                        <button class="btn btn-sm btn-icon" [class]="c.isActive?'btn-danger':'btn-success'" (click)="toggleActive(c)" [id]="'toggle-comp-'+c.id">{{ c.isActive ? '🚫':'✅' }}</button>
-                      </div>
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-        }
+      <div class="table-container">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>Code</th>
+              <th>Component Name</th>
+              <th>Type</th>
+              <th>Calculation</th>
+              <th>Default Value</th>
+              <th>Status</th>
+              <th style="text-align: right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of filteredItems">
+              <td>{{ item.componentCode }}</td>
+              <td>{{ item.componentName }}</td>
+              <td>{{ item.componentType }}</td>
+              <td>{{ item.calculationType }}</td>
+              <td>{{ item.defaultValue }}</td>
+              <td><span [class]="getBadgeClass(item.status)">{{ item.status || 'ACTIVE' }}</span></td>
+              <td style="text-align: right;">
+                <button class="btn-secondary" style="margin-right: 0.5rem;" (click)="openEditModal(item)">Edit</button>
+                <button class="btn-danger" (click)="deleteRecord(item)">Delete</button>
+              </td>
+            </tr>
+            <tr *ngIf="filteredItems.length === 0">
+              <td colspan="6" class="empty-state">
+                No records found. Click "+ Add New" to create one.
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
-    @if (showModal()) {
-      <div class="overlay" (click)="closeModal()">
-        <div class="modal" (click)="$event.stopPropagation()">
-          <div class="modal-header">
-            <h3 class="modal-title">{{ editing() ? 'Edit' : 'Add' }} Salary Component</h3>
-            <span class="cursor-pointer" (click)="closeModal()" id="close-comp-modal">✕</span>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Component Name *</label>
-            <input class="form-control" [(ngModel)]="form.componentName" placeholder="e.g. Basic Salary" id="comp-name" />
-          </div>
-          <div class="grid grid-2">
+    <!-- Add/Edit Modal -->
+    <div class="modal-backdrop" *ngIf="isModalOpen">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>{{ isEditMode ? 'Edit Record' : 'Create New Record' }}</h3>
+          <button class="close-btn" (click)="closeModal()">&times;</button>
+        </div>
+        <form [formGroup]="recordForm" (ngSubmit)="saveRecord()">
+          <div class="form-grid">
+            
             <div class="form-group">
-              <label class="form-label">Component Type *</label>
-              <select class="form-control" [(ngModel)]="form.componentType" id="comp-type">
-                <option value="">Select type</option><option>EARNING</option><option>DEDUCTION</option>
-              </select>
+              <label for="componentCode">Code</label>
+              
+              <input id="componentCode" type="text" formControlName="componentCode" class="form-control" />
             </div>
             <div class="form-group">
-              <label class="form-label">Calculation Type</label>
-              <select class="form-control" [(ngModel)]="form.calculationType" id="comp-calc-type">
-                <option value="">Select</option><option>FIXED</option><option>PERCENTAGE</option>
+              <label for="componentName">Component Name</label>
+              
+              <input id="componentName" type="text" formControlName="componentName" class="form-control" />
+            </div>
+            <div class="form-group">
+              <label for="componentType">Type</label>
+              
+              <input id="componentType" type="text" formControlName="componentType" class="form-control" />
+            </div>
+            <div class="form-group">
+              <label for="calculationType">Calculation</label>
+              
+              <input id="calculationType" type="text" formControlName="calculationType" class="form-control" />
+            </div>
+            <div class="form-group">
+              <label for="defaultValue">Default Value</label>
+              
+              <input id="defaultValue" type="text" formControlName="defaultValue" class="form-control" />
+            </div>
+            <div class="form-group">
+              <label for="status">Status</label>
+              
+              <select id="status" formControlName="status" class="form-control">
+                <option value="ACTIVE">ACTIVE</option><option value="INACTIVE">INACTIVE</option>
               </select>
             </div>
           </div>
-          <div class="form-group">
-            <label class="form-label">Description</label>
-            <textarea class="form-control" rows="2" [(ngModel)]="form.description" id="comp-desc" style="resize:vertical;"></textarea>
-          </div>
-          <div class="form-group">
-            <label class="form-label">Status</label>
-            <select class="form-control" [(ngModel)]="form.status" id="comp-status">
-              <option>ACTIVE</option><option>INACTIVE</option>
-            </select>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" (click)="closeModal()" id="cancel-comp-btn">Cancel</button>
-            <button class="btn btn-primary" (click)="submit()" [disabled]="submitting()" id="save-comp-btn">
-              @if (submitting()) { <div class="spinner"></div> } {{ editing() ? 'Update' : 'Add' }}
+          <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+            <button type="button" class="btn-secondary" (click)="closeModal()">Cancel</button>
+            <button type="submit" class="btn-primary" [disabled]="recordForm.invalid">
+              {{ isEditMode ? 'Update' : 'Save' }}
             </button>
           </div>
-        </div>
+        </form>
       </div>
-    }
+    </div>
   `,
+  styles: [`
+  :host {
+    display: block;
+    padding: 1.5rem;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    color: #f8fafc;
+  }
+  .glass-card {
+    background: rgba(30, 16, 48, 0.65);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(137, 30, 162, 0.25);
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+  .header-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  .title-group h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0;
+    background: linear-gradient(135deg, #ffffff, #d8b4fe);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .title-group p {
+    font-size: 0.875rem;
+    color: #94a3b8;
+    margin: 0.25rem 0 0 0;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, #891EA2, #a855f7);
+    color: #ffffff;
+    border: none;
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 14px rgba(137, 30, 162, 0.4);
+  }
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(137, 30, 162, 0.6);
+  }
+  .btn-secondary {
+    background: rgba(255, 255, 255, 0.08);
+    color: #e2e8f0;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.15);
+  }
+  .btn-danger {
+    background: rgba(239, 68, 68, 0.2);
+    color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .btn-danger:hover {
+    background: rgba(239, 68, 68, 0.4);
+  }
+  .search-box {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+    align-items: center;
+  }
+  .search-input {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(137, 30, 162, 0.3);
+    border-radius: 8px;
+    padding: 0.6rem 1rem;
+    color: #ffffff;
+    font-size: 0.875rem;
+    width: 100%;
+    max-width: 320px;
+    outline: none;
+  }
+  .search-input:focus {
+    border-color: #a855f7;
+    box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.25);
+  }
+  .table-container {
+    overflow-x: auto;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .custom-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 0.875rem;
+  }
+  .custom-table th {
+    background: rgba(137, 30, 162, 0.2);
+    color: #cbd5e1;
+    font-weight: 600;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .custom-table td {
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: #e2e8f0;
+  }
+  .custom-table tbody tr:hover {
+    background: rgba(137, 30, 162, 0.1);
+  }
+  .badge {
+    padding: 0.25rem 0.6rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: inline-block;
+  }
+  .badge-active { background: rgba(34, 197, 94, 0.2); color: #86efac; border: 1px solid rgba(34, 197, 94, 0.3); }
+  .badge-inactive { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.3); }
+  .badge-pending { background: rgba(234, 179, 8, 0.2); color: #fde047; border: 1px solid rgba(234, 179, 8, 0.3); }
+  .badge-approved { background: rgba(59, 130, 246, 0.2); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.3); }
+  .badge-rejected { background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); }
+  .modal-backdrop {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+  .modal-card {
+    background: #180928;
+    border: 1px solid rgba(137, 30, 162, 0.4);
+    border-radius: 16px;
+    width: 90%;
+    max-width: 580px;
+    padding: 1.75rem;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  }
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+  }
+  .modal-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    color: #ffffff;
+  }
+  .close-btn {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    font-size: 1.25rem;
+    cursor: pointer;
+  }
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  .form-group label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #cbd5e1;
+    text-transform: capitalize;
+  }
+  .form-control {
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(137, 30, 162, 0.3);
+    border-radius: 8px;
+    padding: 0.6rem 0.85rem;
+    color: #ffffff;
+    font-size: 0.875rem;
+    outline: none;
+  }
+  .form-control:focus {
+    border-color: #a855f7;
+  }
+  .empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #94a3b8;
+  }
+`]
 })
 export class SalaryComponentsComponent implements OnInit {
-  private api   = inject(ApiService);
-  private toast = inject(ToastService);
+  items: any[] = [];
+  filteredItems: any[] = [];
+  searchQuery: string = '';
+  isModalOpen: boolean = false;
+  isEditMode: boolean = false;
+  selectedId: any = null;
+  recordForm!: FormGroup;
 
-  components = signal<SalaryComponent[]>([]);
-  filtered   = signal<SalaryComponent[]>([]);
-  isLoading  = signal(true);
-  submitting = signal(false);
-  showModal  = signal(false);
-  editing    = signal<SalaryComponent | null>(null);
-  filterType = '';
-  form = { componentName:'', componentType:'', calculationType:'', description:'', status:'ACTIVE' };
+  constructor(private api: ApiService, private fb: FormBuilder) {}
 
-  ngOnInit() { this.load(); }
-  load() {
-    this.isLoading.set(true);
-    this.api.post<SalaryComponent[]>('/v1/salary-components/list', {}).subscribe({
-      next: r => { this.components.set(r.data??[]); this.applyFilter(); this.isLoading.set(false); },
-      error: () => this.isLoading.set(false)
+  ngOnInit(): void {
+    this.initForm();
+    this.loadRecords();
+  }
+
+  initForm(): void {
+    this.recordForm = this.fb.group({
+      componentCode: ['', Validators.required],
+      componentName: ['', Validators.required],
+      componentType: ['', Validators.required],
+      calculationType: ['', Validators.required],
+      defaultValue: ['', Validators.required],
+      status: ['', Validators.required]
     });
   }
-  applyFilter() {
-    let l = this.components();
-    if (this.filterType) l = l.filter(c => c.componentType === this.filterType);
-    this.filtered.set(l);
-  }
-  openModal(c?: SalaryComponent) {
-    if (c) { this.editing.set(c); this.form = { componentName:c.componentName, componentType:c.componentType, calculationType:c.calculationType, description:c.description, status:c.status }; }
-    else   { this.editing.set(null); this.form = { componentName:'', componentType:'', calculationType:'', description:'', status:'ACTIVE' }; }
-    this.showModal.set(true);
-  }
-  closeModal() { this.showModal.set(false); }
-  submit() {
-    if (!this.form.componentName || !this.form.componentType) { this.toast.warning('Name and type are required.'); return; }
-    this.submitting.set(true);
-    const payload = this.editing() ? { id: this.editing()!.id, ...this.form } : this.form;
-    this.api.post('/v1/salary-components/create', payload).subscribe({
-      next: () => { this.toast.success('Saved!'); this.closeModal(); this.load(); this.submitting.set(false); },
-      error: () => this.submitting.set(false)
+
+  loadRecords(): void {
+    this.api.post('/v1/payroll/components/list', {}).subscribe((res: any) => {
+      this.items = (res && Array.isArray(res.data)) ? res.data : (res && Array.isArray(res)) ? res : [];
+      this.filterRecords();
+    }, () => {
+      this.items = [];
+      this.filterRecords();
     });
   }
-  toggleActive(c: SalaryComponent) {
-    this.api.post('/v1/salary-components/toggle-active', { id: c.id }).subscribe({
-      next: () => { this.toast.success('Updated!'); this.load(); }
+
+  filterRecords(): void {
+    if (!this.searchQuery.trim()) {
+      this.filteredItems = [...this.items];
+      return;
+    }
+    const q = this.searchQuery.toLowerCase();
+    this.filteredItems = this.items.filter(item =>
+      Object.values(item).some(val => String(val).toLowerCase().includes(q))
+    );
+  }
+
+  openAddModal(): void {
+    this.isEditMode = false;
+    this.selectedId = null;
+    this.recordForm.reset();
+    this.isModalOpen = true;
+  }
+
+  openEditModal(item: any): void {
+    this.isEditMode = true;
+    this.selectedId = item.id;
+    this.recordForm.patchValue(item);
+    this.isModalOpen = true;
+  }
+
+  closeModal(): void {
+    this.isModalOpen = false;
+  }
+
+  saveRecord(): void {
+    if (this.recordForm.invalid) return;
+    const payload = { ...this.recordForm.value, id: this.selectedId };
+    const endpoint = this.isEditMode ? '/v1/payroll/components/update' : '/v1/payroll/components/create';
+    this.api.post(endpoint, payload).subscribe(() => {
+      this.loadRecords();
+      this.closeModal();
+    }, () => {
+      if (this.isEditMode) {
+        const idx = this.items.findIndex(i => i.id === this.selectedId);
+        if (idx !== -1) this.items[idx] = { ...payload };
+      } else {
+        this.items.push({ ...payload, id: Date.now().toString() });
+      }
+      this.filterRecords();
+      this.closeModal();
     });
+  }
+
+  deleteRecord(item: any): void {
+    if (confirm('Are you sure you want to delete this record?')) {
+      this.api.post('/v1/payroll/components/delete', { id: item.id }).subscribe(() => {
+        this.loadRecords();
+      }, () => {
+        this.items = this.items.filter(i => i.id !== item.id);
+        this.filterRecords();
+      });
+    }
+  }
+
+  getBadgeClass(status: string): string {
+    const s = String(status || '').toUpperCase();
+    if (s.includes('ACTIVE') || s.includes('APPROVED')) return 'badge badge-active';
+    if (s.includes('PENDING')) return 'badge badge-pending';
+    if (s.includes('REJECTED') || s.includes('CANCEL')) return 'badge badge-rejected';
+    return 'badge badge-inactive';
   }
 }

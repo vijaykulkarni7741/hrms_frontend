@@ -1,8 +1,10 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
+import { encryptStorageData, decryptStorageData } from '../utils/crypto.utils';
 
 export interface User {
+  // Existing fields
   id: number;
   employeeCode: string;
   firstName: string;
@@ -15,8 +17,10 @@ export interface User {
   employmentStatus?: string;
   organizationId?: number;
   organizationName?: string;
+  organizationLogo?: string;
   unitId?: number;
   unitName?: string;
+  unitLogo?: string;
   departmentId?: number;
   departmentName?: string;
   designationId?: number;
@@ -31,7 +35,14 @@ export interface User {
   userId?: number;
   username?: string;
   permissions?: string[];
+  // Added fields for UI templates
+  fullName?: string;
+  role?: string;
+  profilePhoto?: string;
+  photoUrl?: string;
+  avatarUrl?: string;
 }
+
 
 @Injectable({ providedIn: 'root' })
 export class AuthStateService {
@@ -66,31 +77,29 @@ export class AuthStateService {
   readonly isEmployee = computed(() => !this.isCEO() && !this.isHR() && !this.isManager() && !this.isAdmin());
 
   constructor(private router: Router) {
-    this._restoreFromLocalStorage();
+    this._restoreFromSessionStorage();
   }
 
   // ── Actions ────────────────────────────────────────────────
   setToken(token: string, sessionId: string): void {
     this._token.set(token);
     this._sessionId.set(sessionId);
-    // Store ONLY token & session in localStorage (no user data until fetched from API)
-    localStorage.setItem(environment.tokenKey,   token);
-    localStorage.setItem(environment.sessionKey, sessionId);
+    sessionStorage.setItem(environment.tokenKey, encryptStorageData(token));
+    sessionStorage.setItem(environment.sessionKey, encryptStorageData(sessionId));
   }
 
   setUser(user: User): void {
     this._user.set(user);
-    // Store user in localStorage for tab persistence — NO sessionStorage used anywhere
-    localStorage.setItem(environment.userKey, JSON.stringify(user));
+    sessionStorage.setItem(environment.userKey, encryptStorageData(JSON.stringify(user)));
   }
 
   logout(): void {
     this._token.set(null);
     this._sessionId.set(null);
     this._user.set(null);
-    localStorage.removeItem(environment.tokenKey);
-    localStorage.removeItem(environment.sessionKey);
-    localStorage.removeItem(environment.userKey);
+    sessionStorage.removeItem(environment.tokenKey);
+    sessionStorage.removeItem(environment.sessionKey);
+    sessionStorage.removeItem(environment.userKey);
     this.router.navigate(['/login']);
   }
 
@@ -98,8 +107,52 @@ export class AuthStateService {
 
   // ── Permission Helpers ─────────────────────────────────────
   hasPermission(permission: string): boolean {
-    // With role-based approach: check roleName OR explicit permissions list
-    return this.permissions().includes(permission);
+    if (!permission) return true;
+    if (this.isAdmin()) return true;
+
+    const user = this._user();
+
+    // 1. Check User-Specific Overrides from Session Storage / Memory
+    try {
+      const uStr = decryptStorageData(sessionStorage.getItem('hrms_user_overrides'));
+      if (uStr && user) {
+        const userOverridesList = JSON.parse(uStr);
+        const myOverride = userOverridesList.find((u: any) =>
+          (u.userId && Number(u.userId) === Number(user.id)) ||
+          (u.employeeCode && user.employeeCode && u.employeeCode === user.employeeCode)
+        );
+        if (myOverride && myOverride.overrides && myOverride.overrides[permission]) {
+          const ov = myOverride.overrides[permission];
+          if (ov === 'GRANT') return true;
+          if (ov === 'DENY') return false;
+        }
+      }
+    } catch {
+      // fallback
+    }
+
+    // 2. Check Role-Wise Matrix from Session Storage / Memory
+    try {
+      const rStr = decryptStorageData(sessionStorage.getItem('hrms_role_matrix'));
+      if (rStr && user) {
+        const roleMatrixList = JSON.parse(rStr);
+        const myRole = roleMatrixList.find((r: any) =>
+          (r.roleCode && user.roleCode && r.roleCode === user.roleCode) ||
+          (r.roleCode && user.role && r.roleCode === user.role)
+        );
+        if (myRole && Array.isArray(myRole.assignedButtonCodes)) {
+          if (myRole.assignedButtonCodes.includes(permission)) return true;
+        }
+      }
+    } catch {
+      // fallback
+    }
+
+    // 3. Fallback to default HR rights or API permissions array
+    if (this.isHR()) return true;
+    const perms = this.permissions();
+    if (!perms || perms.length === 0) return false;
+    return perms.includes(permission) || perms.includes('*');
   }
 
   hasAnyPermission(perms: string[]): boolean {
@@ -107,15 +160,23 @@ export class AuthStateService {
   }
 
   hasRole(role: string): boolean {
-    return this.roleName().toLowerCase().includes(role.toLowerCase()) ||
-           this.roleCode().toLowerCase().includes(role.toLowerCase());
+    if (this.isAdmin()) return true;
+    const rName = (this.roleName() || '').toLowerCase();
+    const rCode = (this.roleCode() || '').toLowerCase();
+    const uRole = (this._user()?.role || '').toLowerCase();
+    const target = role.toLowerCase();
+    return rName.includes(target) || rCode.includes(target) || uRole.includes(target);
   }
 
   // ── Restore ────────────────────────────────────────────────
-  private _restoreFromLocalStorage(): void {
-    const token     = localStorage.getItem(environment.tokenKey);
-    const sessionId = localStorage.getItem(environment.sessionKey);
-    const userStr   = localStorage.getItem(environment.userKey);
+  private _restoreFromSessionStorage(): void {
+    const rawToken     = sessionStorage.getItem(environment.tokenKey);
+    const rawSessionId = sessionStorage.getItem(environment.sessionKey);
+    const rawUserStr   = sessionStorage.getItem(environment.userKey);
+
+    const token     = decryptStorageData(rawToken);
+    const sessionId = decryptStorageData(rawSessionId);
+    const userStr   = decryptStorageData(rawUserStr);
 
     if (token && sessionId) {
       this._token.set(token);

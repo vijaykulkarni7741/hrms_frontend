@@ -1,8 +1,8 @@
 import { Component, OnInit, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
-import { ApiService } from '../../../core/services/api.service';
-import { AuthStateService } from '../../../core/state/auth-state.service';
+import { ApiService } from 'src/app/services/api.service';
+import { AuthStateService } from 'src/app/core/state/auth-state.service';
 
 @Component({
   selector: 'app-employee-dashboard',
@@ -233,28 +233,13 @@ export class EmployeeDashboardComponent implements OnInit {
   ngOnInit() { this.load(); }
   load() {
     this.api.post<any>('/v1/dashboard/employee-stats', {}).subscribe({
-      next: r => { if (r.success) { this.stats.set(r.data.stats); this.leaveBalances.set(r.data.leaveBalances??[]); this.myLeaves.set(r.data.myLeaves??[]); this.holidays.set(r.data.holidays??[]); }},
-      error: () => this.loadDemo()
+      next: (r: any) => { if (r && r.data) { this.stats.set(r.data.stats || {}); this.leaveBalances.set(r.data.leaveBalances??[]); this.myLeaves.set(r.data.myLeaves??[]); this.holidays.set(r.data.holidays??[]); }},
+      error: () => {
+        this.stats.set({ todayStatus: '—', checkInTime: '', checkOutTime: '', hoursWorked: 0, leaveBalance: 0, attendedDays: 0, payslipsCount: 0, presentDays: 0, absentDays: 0, leaveTaken: 0, lateDays: 0, earlyDepartureDays: 0, lastSalary: 0 });
+        this.leaveBalances.set([]);
+        this.myLeaves.set([]);
+        this.holidays.set([]);
+      }
     });
-  }
-  loadDemo() {
-    this.stats.set({ todayStatus:'PRESENT', checkInTime:'09:05', checkOutTime:'', hoursWorked:7.5, leaveBalance:14, attendedDays:21, payslipsCount:8, presentDays:21, absentDays:1, leaveTaken:2, lateDays:2, earlyDepartureDays:1, lastSalary:55000 });
-    this.leaveBalances.set([
-      { type:'Casual Leave',   total:12, remaining:10, icon:'🌴', color:'var(--success)' },
-      { type:'Sick Leave',     total: 8, remaining: 7, icon:'🏥', color:'var(--danger)'  },
-      { type:'Earned Leave',   total:15, remaining:13, icon:'✈️', color:'var(--info)'    },
-      { type:'Comp Off',       total: 3, remaining: 2, icon:'🔄', color:'var(--warning)' },
-    ]);
-    this.myLeaves.set([
-      { id:1, leaveType:'Casual Leave', from:'25 Aug', to:'26 Aug', days:2, status:'APPROVED', icon:'✅', remarks:'' },
-      { id:2, leaveType:'Sick Leave',   from:'10 Aug', to:'10 Aug', days:1, status:'APPROVED', icon:'🏥', remarks:'' },
-      { id:3, leaveType:'Earned Leave', from:'15 Sep', to:'17 Sep', days:3, status:'PENDING',  icon:'🌴', remarks:'' },
-    ]);
-    this.holidays.set([
-      { day:'15', month:'Aug', name:'Independence Day', type:'National Holiday' },
-      { day:'02', month:'Oct', name:'Gandhi Jayanti',   type:'National Holiday' },
-      { day:'24', month:'Oct', name:'Dussehra',         type:'Festival Holiday' },
-      { day:'12', month:'Nov', name:'Diwali',           type:'Festival Holiday' },
-    ]);
   }
 }

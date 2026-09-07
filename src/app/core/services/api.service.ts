@@ -50,7 +50,15 @@ export class ApiService {
 
   // ── POST ─────────────────────────────────────────────────────
   post<T>(url: string, body: any = {}): Observable<ApiResponse<T>> {
-    return this.http.post<ApiResponse<T>>(this._url(url), body)
+    let payload = body || {};
+    if (typeof url === 'string' && (url.includes('/list') || url.includes('/get-all'))) {
+      payload = {
+        page: payload.page !== undefined ? payload.page : 0,
+        size: payload.size !== undefined ? payload.size : 10,
+        ...payload
+      };
+    }
+    return this.http.post<ApiResponse<T>>(this._url(url), payload)
       .pipe(catchError(err => this._handleError(err)));
   }
 
@@ -86,7 +94,17 @@ export class ApiService {
 
   // ── Private ──────────────────────────────────────────────────
   private _url(path: string): string {
-    return path.startsWith('http') ? path : `${this.baseUrl}${path}`;
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    let formattedPath = path.startsWith('/') ? path : '/' + path;
+    if (formattedPath.startsWith('/v1/')) {
+      formattedPath = '/api' + formattedPath;
+    } else if (!formattedPath.startsWith('/api')) {
+      formattedPath = '/api/v1' + formattedPath;
+    }
+    const base = (this.baseUrl && this.baseUrl.trim() !== '') 
+      ? this.baseUrl.replace(/\/api\/?$/, '') 
+      : 'http://localhost:8080';
+    return `${base}${formattedPath}`;
   }
 
   private _handleError(error: any): Observable<never> {

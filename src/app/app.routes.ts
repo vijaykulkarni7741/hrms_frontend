@@ -48,11 +48,23 @@ export const routes: Routes = [
         path: 'designations',
         loadComponent: () => import('./features/employees/designations/designations.component').then(m => m.DesignationsComponent),
       },
+      {
+        path: 'assets',
+        loadComponent: () => import('./features/assets/asset-allocation.component').then(m => m.AssetAllocationComponent),
+      },
+      {
+        path: 'resignations',
+        loadComponent: () => import('./features/resignation/resignation-list.component').then(m => m.ResignationListComponent),
+      },
 
       // ── Attendance ───────────────────────────────────────────
       {
         path: 'attendance',
         loadComponent: () => import('./features/attendance/attendance-list/attendance-list.component').then(m => m.AttendanceListComponent),
+      },
+      {
+        path: 'attendance/mark',
+        loadComponent: () => import('./features/attendance/mark-attendance/mark-attendance.component').then(m => m.MarkAttendanceComponent),
       },
       {
         path: 'shifts',
@@ -149,8 +161,36 @@ export const routes: Routes = [
         loadComponent: () => import('./features/admin/branches/branches.component').then(m => m.BranchesComponent),
       },
       {
+        path: 'admin/countries',
+        loadComponent: () => import('./features/admin/countries/countries.component').then(m => m.CountriesComponent),
+      },
+      {
+        path: 'admin/states',
+        loadComponent: () => import('./features/admin/states/states.component').then(m => m.StatesComponent),
+      },
+      {
+        path: 'admin/cities',
+        loadComponent: () => import('./features/admin/cities/cities.component').then(m => m.CitiesComponent),
+      },
+      {
+        path: 'admin/units',
+        loadComponent: () => import('./features/admin/units/units.component').then(m => m.UnitsComponent),
+      },
+      {
         path: 'admin/policies',
         loadComponent: () => import('./features/admin/policies/policies.component').then(m => m.PoliciesComponent),
+      },
+      {
+        path: 'admin/rules',
+        loadComponent: () => import('./features/admin/rules/hr-rule-config.component').then(m => m.HrRuleConfigComponent),
+      },
+      {
+        path: 'admin/lookup-types',
+        loadComponent: () => import('./features/admin/lookup-masters/lookup-masters.component').then(m => m.LookupMastersComponent),
+      },
+      {
+        path: 'admin/lookup-values',
+        loadComponent: () => import('./features/admin/lookup-masters/lookup-masters.component').then(m => m.LookupMastersComponent),
       },
 
       // ── Misc ─────────────────────────────────────────────────
@@ -161,6 +201,63 @@ export const routes: Routes = [
       {
         path: 'profile',
         loadComponent: () => import('./features/profile/profile.component').then(m => m.ProfileComponent),
+      },
+      // ── New CRUD Screens ────────────────────────────────────────
+      {
+        path: 'departments/new',
+        loadComponent: () => import('./features/employees/departments/department-form/department-form.component').then(m => m.DepartmentFormComponent),
+      },
+      {
+        path: 'departments/:id/edit',
+        loadComponent: () => import('./features/employees/departments/department-form/department-form.component').then(m => m.DepartmentFormComponent),
+      },
+      {
+        path: 'designations/new',
+        loadComponent: () => import('./features/employees/designations/designation-form/designation-form.component').then(m => m.DesignationFormComponent),
+      },
+      {
+        path: 'designations/:id/edit',
+        loadComponent: () => import('./features/employees/designations/designation-form/designation-form.component').then(m => m.DesignationFormComponent),
+      },
+      {
+        path: 'attendance/add',
+        loadComponent: () => import('./features/attendance/attendance-form/attendance-form.component').then(m => m.AttendanceFormComponent),
+      },
+      {
+        path: 'shifts/new',
+        loadComponent: () => import('./features/attendance/shifts/shift-form/shift-form.component').then(m => m.ShiftFormComponent),
+      },
+      {
+        path: 'shifts/:id/edit',
+        loadComponent: () => import('./features/attendance/shifts/shift-form/shift-form.component').then(m => m.ShiftFormComponent),
+      },
+      {
+        path: 'holidays/new',
+        loadComponent: () => import('./features/attendance/holidays/holiday-form/holiday-form.component').then(m => m.HolidayFormComponent),
+      },
+      {
+        path: 'holidays/:id/edit',
+        loadComponent: () => import('./features/attendance/holidays/holiday-form/holiday-form.component').then(m => m.HolidayFormComponent),
+      },
+      {
+        path: 'leave/request',
+        loadComponent: () => import('./features/leave/leave-request/leave-request.component').then(m => m.LeaveRequestComponent),
+      },
+      {
+        path: 'workflows/new',
+        loadComponent: () => import('./features/workflow/workflow-form/workflow-form.component').then(m => m.WorkflowFormComponent),
+      },
+      {
+        path: 'travel/new',
+        loadComponent: () => import('./features/travel/travel-form/travel-form.component').then(m => m.TravelFormComponent),
+      },
+      {
+        path: 'admin/users/new',
+        loadComponent: () => import('./features/admin/users/user-form/user-form.component').then(m => m.UserFormComponent),
+      },
+      {
+        path: 'admin/users/:id/edit',
+        loadComponent: () => import('./features/admin/users/user-form/user-form.component').then(m => m.UserFormComponent),
       },
 
       // Catch-all

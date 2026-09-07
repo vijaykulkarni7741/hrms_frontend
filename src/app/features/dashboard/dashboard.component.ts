@@ -1,15 +1,21 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { AuthStateService } from '../../../core/state/auth-state.service';
-import { CeoDashboardComponent } from '../ceo-dashboard/ceo-dashboard.component';
-import { HrDashboardComponent } from '../hr-dashboard/hr-dashboard.component';
-import { ManagerDashboardComponent } from '../manager-dashboard/manager-dashboard.component';
-import { EmployeeDashboardComponent } from '../employee-dashboard/employee-dashboard.component';
+import { AuthStateService } from 'src/app/core/state/auth-state.service';
+import { CeoDashboardComponent } from './ceo-dashboard/ceo-dashboard.component';
+import { HrDashboardComponent } from './hr-dashboard/hr-dashboard.component';
+import { ManagerDashboardComponent } from './manager-dashboard/manager-dashboard.component';
+import { EmployeeDashboardComponent } from './employee-dashboard/employee-dashboard.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, CeoDashboardComponent, HrDashboardComponent, ManagerDashboardComponent, EmployeeDashboardComponent],
+  imports: [
+    CommonModule,
+    CeoDashboardComponent,
+    HrDashboardComponent,
+    ManagerDashboardComponent,
+    EmployeeDashboardComponent
+  ],
   template: `
     @if (authState.isCEO()) {
       <app-ceo-dashboard></app-ceo-dashboard>

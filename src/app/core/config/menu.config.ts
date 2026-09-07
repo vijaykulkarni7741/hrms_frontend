@@ -24,13 +24,15 @@ export const MENU_ITEMS: MenuItem[] = [
     id: 'employees',
     label: 'Employees',
     icon: '👥',
-    permission: 'EMPLOYEE_VIEW',
+    roles: ['ADMIN', 'HR_MANAGER', 'HR_EXECUTIVE'],
     children: [
-      { id: 'employee-list',    label: 'All Employees',   icon: '📋', route: '/employees',            permission: 'EMPLOYEE_VIEW'   },
-      { id: 'employee-add',     label: 'Add Employee',    icon: '➕', route: '/employees/new',         permission: 'EMPLOYEE_CREATE' },
-      { id: 'departments',      label: 'Departments',     icon: '🏢', route: '/departments',           permission: 'DEPARTMENT_VIEW' },
-      { id: 'designations',     label: 'Designations',    icon: '💼', route: '/designations',          permission: 'DESIGNATION_VIEW'},
-      { id: 'document-types',   label: 'Document Types',  icon: '📄', route: '/document-types',        permission: 'DOCUMENT_VIEW'   },
+      { id: 'employee-list',    label: 'All Employees',   icon: '📋', route: '/employees',            roles: ['ADMIN', 'HR_MANAGER', 'HR_EXECUTIVE']   },
+      { id: 'employee-add',     label: 'Add Employee',    icon: '➕', route: '/employees/new',         roles: ['ADMIN', 'HR_MANAGER', 'HR_EXECUTIVE'] },
+      { id: 'departments',      label: 'Departments',     icon: '🏢', route: '/departments',           roles: ['ADMIN', 'HR_MANAGER'] },
+      { id: 'designations',     label: 'Designations',    icon: '💼', route: '/designations',          roles: ['ADMIN', 'HR_MANAGER'] },
+      { id: 'asset-allocations', label: 'Asset Allocations', icon: '💻', route: '/assets',              roles: ['ADMIN', 'HR_MANAGER', 'HR_EXECUTIVE'] },
+      { id: 'resignation-queue', label: 'Resignation Approvals', icon: '📜', route: '/resignations',      roles: ['ADMIN', 'HR_MANAGER', 'HR_EXECUTIVE', 'SENIOR_MANAGER', 'MANAGER'] },
+      { id: 'document-types',   label: 'Document Types',  icon: '📄', route: '/document-types',        roles: ['ADMIN', 'HR_MANAGER']   },
     ],
   },
 
@@ -39,11 +41,11 @@ export const MENU_ITEMS: MenuItem[] = [
     id: 'attendance',
     label: 'Attendance',
     icon: '🕐',
-    permission: 'ATTENDANCE_VIEW',
     children: [
-      { id: 'attendance-log',     label: 'Attendance Log',   icon: '📅', route: '/attendance',           permission: 'ATTENDANCE_VIEW'   },
-      { id: 'shifts',             label: 'Shift Management', icon: '🔄', route: '/shifts',               permission: 'SHIFT_VIEW'        },
-      { id: 'holidays',           label: 'Holiday Calendar', icon: '🎉', route: '/holidays',             permission: 'HOLIDAY_VIEW'      },
+      { id: 'mark-attendance',    label: 'Live Selfie Check-In', icon: '📸', route: '/attendance/mark' },
+      { id: 'attendance-log',     label: 'Attendance Log',   icon: '📅', route: '/attendance' },
+      { id: 'shifts',             label: 'Shift & Week-Off',       icon: '🔄', route: '/shifts' },
+      { id: 'holidays',           label: 'Holiday Calendar', icon: '🎉', route: '/holidays' },
     ],
   },
 
@@ -52,12 +54,11 @@ export const MENU_ITEMS: MenuItem[] = [
     id: 'leave',
     label: 'Leave',
     icon: '🌴',
-    permission: 'LEAVE_VIEW',
     children: [
-      { id: 'my-leaves',          label: 'My Leaves',        icon: '📤', route: '/leave/my',             permission: 'LEAVE_APPLY'       },
-      { id: 'leave-approvals',    label: 'Approvals',        icon: '✔️', route: '/leave/approvals',      permission: 'LEAVE_APPROVE'     },
-      { id: 'leave-types',        label: 'Leave Types',      icon: '🗂️', route: '/leave-types',          permission: 'LEAVE_TYPE_VIEW'   },
-      { id: 'leave-balances',     label: 'Leave Balances',   icon: '⚖️', route: '/leave/balances',       permission: 'LEAVE_VIEW'        },
+      { id: 'my-leaves',          label: 'My Leaves',        icon: '📤', route: '/leave/my' },
+      { id: 'leave-approvals',    label: 'Approvals',        icon: '✔️', route: '/leave/approvals',      roles: ['ADMIN', 'HR_MANAGER', 'HR_EXECUTIVE', 'SENIOR_MANAGER', 'MANAGER'] },
+      { id: 'leave-types',        label: 'Leave Types',      icon: '🗂️', route: '/leave-types',          roles: ['ADMIN', 'HR_MANAGER'] },
+      { id: 'leave-balances',     label: 'Leave Balances',   icon: '⚖️', route: '/leave/balances',       roles: ['ADMIN', 'HR_MANAGER'] },
     ],
   },
 
@@ -66,13 +67,13 @@ export const MENU_ITEMS: MenuItem[] = [
     id: 'payroll',
     label: 'Payroll',
     icon: '💰',
-    permission: 'PAYROLL_VIEW',
+    roles: ['ADMIN', 'HR_MANAGER'],
     children: [
-      { id: 'salary-slips',       label: 'Salary Slips',     icon: '🧾', route: '/payroll/slips',        permission: 'PAYROLL_VIEW'      },
-      { id: 'salary-structures',  label: 'Salary Structures',icon: '📊', route: '/payroll/structures',   permission: 'PAYROLL_MANAGE'    },
-      { id: 'salary-components',  label: 'Components',       icon: '🔧', route: '/payroll/components',   permission: 'PAYROLL_MANAGE'    },
-      { id: 'tax-rules',          label: 'Tax Rules',        icon: '📑', route: '/payroll/tax-rules',    permission: 'PAYROLL_MANAGE'    },
-      { id: 'process-payroll',    label: 'Process Payroll',  icon: '▶️', route: '/payroll/process',      permission: 'PAYROLL_PROCESS'   },
+      { id: 'salary-slips',       label: 'Salary Slips',     icon: '🧾', route: '/payroll/slips' },
+      { id: 'salary-structures',  label: 'Salary Structures',icon: '📊', route: '/payroll/structures',   roles: ['ADMIN', 'HR_MANAGER'] },
+      { id: 'salary-components',  label: 'Components',       icon: '🔧', route: '/payroll/components',   roles: ['ADMIN', 'HR_MANAGER'] },
+      { id: 'tax-rules',          label: 'Tax Rules',        icon: '📑', route: '/payroll/tax-rules',    roles: ['ADMIN', 'HR_MANAGER'] },
+      { id: 'process-payroll',    label: 'Process Payroll',  icon: '▶️', route: '/payroll/process',      roles: ['ADMIN', 'HR_MANAGER'] },
     ],
   },
 
@@ -81,24 +82,31 @@ export const MENU_ITEMS: MenuItem[] = [
     id: 'workflow',
     label: 'Workflows',
     icon: '🔀',
-    permission: 'WORKFLOW_VIEW',
+    roles: ['ADMIN', 'HR_MANAGER', 'SENIOR_MANAGER', 'MANAGER'],
     children: [
-      { id: 'workflow-list',      label: 'All Workflows',    icon: '📋', route: '/workflows',            permission: 'WORKFLOW_VIEW'     },
-      { id: 'workflow-approvals', label: 'My Approvals',     icon: '✅', route: '/workflows/approvals',  permission: 'WORKFLOW_APPROVE'  },
+      { id: 'workflow-list',      label: 'All Workflows',    icon: '📋', route: '/workflows' },
+      { id: 'workflow-approvals', label: 'My Approvals',     icon: '✅', route: '/workflows/approvals' },
     ],
   },
 
   // ── Travel & Expenses ────────────────────────────────────────
   {
     id: 'travel',
-    label: 'Travel',
+    label: 'Travel & Expenses',
     icon: '✈️',
-    permission: 'TRAVEL_VIEW',
     children: [
-      { id: 'travel-requests',    label: 'My Requests',      icon: '📤', route: '/travel',               permission: 'TRAVEL_APPLY'      },
-      { id: 'travel-approvals',   label: 'Approvals',        icon: '✔️', route: '/travel/approvals',     permission: 'TRAVEL_APPROVE'    },
-      { id: 'expense-claims',     label: 'Expense Claims',   icon: '🧾', route: '/expenses',             permission: 'EXPENSE_VIEW'      },
+      { id: 'travel-requests',    label: 'My Requests',      icon: '📤', route: '/travel' },
+      { id: 'travel-approvals',   label: 'Approvals',        icon: '✔️', route: '/travel/approvals',     roles: ['ADMIN', 'HR_MANAGER', 'SENIOR_MANAGER', 'MANAGER'] },
+      { id: 'expense-claims',     label: 'Expense Claims',   icon: '🧾', route: '/expenses' },
     ],
+  },
+
+  // ── Policies ─────────────────────────────────────────────────
+  {
+    id: 'company-policies',
+    label: 'Company Policies',
+    icon: '📜',
+    route: '/admin/policies',
     dividerAfter: true,
   },
 
@@ -109,28 +117,19 @@ export const MENU_ITEMS: MenuItem[] = [
     icon: '⚙️',
     roles: ['ADMIN', 'HR_MANAGER'],
     children: [
-      { id: 'users',              label: 'Users',            icon: '👤', route: '/admin/users',          permission: 'USER_VIEW'         },
-      { id: 'roles',              label: 'Roles',            icon: '🔑', route: '/admin/roles',          permission: 'ROLE_VIEW'         },
-      { id: 'permissions',        label: 'Permissions',      icon: '🛡️', route: '/admin/permissions',    permission: 'PERMISSION_VIEW'   },
-      { id: 'company',            label: 'Company Setup',    icon: '🏗️', route: '/admin/company',        permission: 'COMPANY_VIEW'      },
-      { id: 'branches',           label: 'Branches',         icon: '🏢', route: '/admin/branches',       permission: 'BRANCH_VIEW'       },
-      { id: 'policies',           label: 'Policies',         icon: '📜', route: '/admin/policies',       permission: 'POLICY_VIEW'       },
+      { id: 'users',              label: 'Users',            icon: '👤', route: '/admin/users' },
+      { id: 'roles',              label: 'Roles',            icon: '🔑', route: '/admin/roles' },
+      { id: 'permissions',        label: 'Permissions',      icon: '🛡️', route: '/admin/permissions' },
+      { id: 'company',            label: 'Company Setup',    icon: '🏗️', route: '/admin/company' },
+      { id: 'branches',           label: 'Branches',         icon: '🏢', route: '/admin/branches' },
+      { id: 'countries',          label: 'Countries',        icon: '🌐', route: '/admin/countries' },
+      { id: 'states',             label: 'States',           icon: '🗺️', route: '/admin/states' },
+      { id: 'cities',             label: 'Cities',           icon: '🏙️', route: '/admin/cities' },
+      { id: 'units',              label: 'Units',            icon: '📍', route: '/admin/units' },
+      { id: 'hr-rules',           label: 'HR Policy Rules',  icon: '⚙️', route: '/admin/rules' },
+      { id: 'lookup-types',       label: 'Lookup Types Master', icon: '🗂️', route: '/admin/lookup-types' },
+      { id: 'lookup-values',      label: 'Lookup Values Master', icon: '🏷️', route: '/admin/lookup-values' },
     ],
   },
-
-  // ── Notifications ────────────────────────────────────────────
-  {
-    id: 'notifications',
-    label: 'Notifications',
-    icon: '🔔',
-    route: '/notifications',
-  },
-
-  // ── Profile ──────────────────────────────────────────────────
-  {
-    id: 'profile',
-    label: 'My Profile',
-    icon: '👤',
-    route: '/profile',
-  },
 ];
+

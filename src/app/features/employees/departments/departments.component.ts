@@ -1,81 +1,448 @@
-import { Component, OnInit, signal, inject } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { ApiService } from '../../../core/services/api.service';
-import { ToastService } from '../../../core/services/toast.service';
+import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { ApiService } from 'src/app/services/api.service';
 
-interface Department { id: number; departmentCode: string; departmentName: string; departmentType: string; email: string; mobile: string; extensionNumber: string; description: string; status: string; isActive: boolean; displayOrder: number; }
-
-@Component({ selector: 'app-departments', standalone: true, imports: [CommonModule, FormsModule],
+@Component({
+  selector: 'app-departments',
+  standalone: true,
+  imports: [CommonModule, FormsModule, ReactiveFormsModule],
   template: `
-    <div class="page-container">
-      <div class="page-header">
-        <div><h2 class="page-title">🏢 Departments</h2><p class="page-subtitle">{{ items().length }} departments</p></div>
-        <button class="btn btn-primary" (click)="openModal()" id="add-dept-btn">➕ Add Department</button>
+    <div class="glass-card">
+      <div class="header-actions">
+        <div class="title-group">
+          <h2>Departments Management</h2>
+          <p>Manage company departments and organizational structure</p>
+        </div>
+        <button class="btn-primary" (click)="openAddModal()">
+          <span>+</span> Add New
+        </button>
       </div>
-      <div class="card" style="padding:0;overflow:hidden;">
-        @if (isLoading()) { <div class="flex-center" style="padding:60px;"><div class="spinner spinner-lg"></div></div>
-        } @else if (items().length===0) { <div class="empty-state"><div class="empty-icon">🏢</div><h3>No departments</h3></div>
-        } @else {
-          <div class="table-wrapper"><table>
-            <thead><tr><th>Code</th><th>Name</th><th>Type</th><th>Email</th><th>Mobile</th><th>Status</th><th>Actions</th></tr></thead>
-            <tbody>
-              @for (d of items(); track d.id) {
-                <tr>
-                  <td><code style="background:var(--bg-input);padding:2px 6px;border-radius:4px;font-size:0.78rem;">{{ d.departmentCode }}</code></td>
-                  <td><strong>{{ d.departmentName }}</strong></td>
-                  <td>{{ d.departmentType || '—' }}</td>
-                  <td>{{ d.email || '—' }}</td>
-                  <td>{{ d.mobile || '—' }}</td>
-                  <td><span class="badge" [class]="d.status==='ACTIVE'?'badge-success':'badge-warning'">{{ d.status }}</span></td>
-                  <td><div style="display:flex;gap:6px;">
-                    <button class="btn btn-secondary btn-sm btn-icon" (click)="openModal(d)" [id]="'edit-dept-'+d.id">✏️</button>
-                    <button class="btn btn-sm btn-icon" [class]="d.isActive?'btn-danger':'btn-success'" (click)="toggleActive(d)" [id]="'toggle-dept-'+d.id">{{ d.isActive?'🚫':'✅' }}</button>
-                  </div></td>
-                </tr>
-              }
-            </tbody>
-          </table></div>
-        }
+
+      <div class="search-box">
+        <input
+          type="text"
+          class="search-input"
+          placeholder="Search records..."
+          [(ngModel)]="searchQuery"
+          (input)="filterRecords()"
+        />
+        <button class="btn-secondary" (click)="loadRecords()">Refresh</button>
+      </div>
+
+      <div class="table-container">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>Department Code</th>
+              <th>Department Name</th>
+              <th>Head of Dept</th>
+              <th>Total Employees</th>
+              <th>Status</th>
+              <th style="text-align: right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of filteredItems">
+              <td>{{ item.departmentCode }}</td>
+              <td>{{ item.departmentName }}</td>
+              <td>{{ item.headOfDepartment }}</td>
+              <td>{{ item.totalEmployees }}</td>
+              <td><span [class]="getBadgeClass(item.status)">{{ item.status || 'ACTIVE' }}</span></td>
+              <td style="text-align: right;">
+                <button class="btn-secondary" style="margin-right: 0.5rem;" (click)="openEditModal(item)">Edit</button>
+                <button class="btn-danger" (click)="deleteRecord(item)">Delete</button>
+              </td>
+            </tr>
+            <tr *ngIf="filteredItems.length === 0">
+              <td colspan="6" class="empty-state">
+                No records found. Click "+ Add New" to create one.
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
-    @if (showModal()) {
-      <div class="overlay" (click)="closeModal()"><div class="modal" (click)="$event.stopPropagation()">
-        <div class="modal-header"><h3 class="modal-title">{{ editing() ? 'Edit' : 'Add' }} Department</h3><span class="cursor-pointer" (click)="closeModal()" id="close-dept-modal">✕</span></div>
-        <div class="grid grid-2">
-          <div class="form-group"><label class="form-label">Department Code *</label><input class="form-control" [(ngModel)]="form.departmentCode" id="dept-code" /></div>
-          <div class="form-group"><label class="form-label">Department Name *</label><input class="form-control" [(ngModel)]="form.departmentName" id="dept-name" /></div>
-          <div class="form-group"><label class="form-label">Department Type</label><input class="form-control" [(ngModel)]="form.departmentType" id="dept-type" placeholder="e.g. Technical, HR" /></div>
-          <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-control" [(ngModel)]="form.email" id="dept-email" /></div>
-          <div class="form-group"><label class="form-label">Mobile</label><input class="form-control" [(ngModel)]="form.mobile" id="dept-mobile" /></div>
-          <div class="form-group"><label class="form-label">Extension</label><input class="form-control" [(ngModel)]="form.extensionNumber" id="dept-ext" /></div>
+
+    <!-- Add/Edit Modal -->
+    <div class="modal-backdrop" *ngIf="isModalOpen">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>{{ isEditMode ? 'Edit Record' : 'Create New Record' }}</h3>
+          <button class="close-btn" (click)="closeModal()">&times;</button>
         </div>
-        <div class="form-group"><label class="form-label">Description</label><textarea class="form-control" rows="2" [(ngModel)]="form.description" id="dept-desc" style="resize:vertical;"></textarea></div>
-        <div class="grid grid-2">
-          <div class="form-group"><label class="form-label">Status</label><select class="form-control" [(ngModel)]="form.status" id="dept-status"><option>ACTIVE</option><option>INACTIVE</option></select></div>
-          <div class="form-group"><label class="form-label">Display Order</label><input type="number" class="form-control" [(ngModel)]="form.displayOrder" id="dept-order" /></div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" (click)="closeModal()" id="cancel-dept-btn">Cancel</button>
-          <button class="btn btn-primary" (click)="submit()" [disabled]="submitting()" id="save-dept-btn">@if(submitting()){<div class="spinner"></div>} Save</button>
-        </div>
-      </div></div>
-    }
+        <form [formGroup]="recordForm" (ngSubmit)="saveRecord()">
+          <div class="form-grid">
+            
+            <div class="form-group">
+              <label for="departmentCode">Department Code</label>
+              
+              <input id="departmentCode" type="text" formControlName="departmentCode" class="form-control" />
+            </div>
+            <div class="form-group">
+              <label for="departmentName">Department Name</label>
+              
+              <input id="departmentName" type="text" formControlName="departmentName" class="form-control" />
+            </div>
+            <div class="form-group">
+              <label for="headOfDepartment">Head of Dept (Manager / Employee)</label>
+              <select id="headOfDepartment" formControlName="headOfDepartment" class="form-control select-dropdown">
+                <option value="">-- Select Head of Department --</option>
+                <option *ngFor="let emp of employees" [value]="emp.firstName + ' ' + emp.lastName">
+                  {{ emp.employeeCode }} - {{ emp.firstName }} {{ emp.lastName }} {{ emp.department?.departmentName ? '(' + emp.department.departmentName + ')' : '' }}
+                </option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="totalEmployees">Total Employees</label>
+              
+              <input id="totalEmployees" type="number" formControlName="totalEmployees" class="form-control" />
+            </div>
+            <div class="form-group">
+              <label for="status">Status</label>
+              
+              <select id="status" formControlName="status" class="form-control">
+                <option value="ACTIVE">ACTIVE</option><option value="INACTIVE">INACTIVE</option>
+              </select>
+            </div>
+          </div>
+          <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+            <button type="button" class="btn-secondary" (click)="closeModal()">Cancel</button>
+            <button type="submit" class="btn-primary" [disabled]="recordForm.invalid">
+              {{ isEditMode ? 'Update' : 'Save' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   `,
+  styles: [`
+  :host {
+    display: block;
+    padding: 1.5rem;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    color: #f8fafc;
+  }
+  .glass-card {
+    background: rgba(30, 16, 48, 0.65);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(137, 30, 162, 0.25);
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  }
+  .header-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  .title-group h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0;
+    background: linear-gradient(135deg, #ffffff, #d8b4fe);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .title-group p {
+    font-size: 0.875rem;
+    color: #94a3b8;
+    margin: 0.25rem 0 0 0;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, #891EA2, #a855f7);
+    color: #ffffff;
+    border: none;
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 14px rgba(137, 30, 162, 0.4);
+  }
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(137, 30, 162, 0.6);
+  }
+  .btn-secondary {
+    background: rgba(255, 255, 255, 0.08);
+    color: #e2e8f0;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.15);
+  }
+  .btn-danger {
+    background: rgba(239, 68, 68, 0.2);
+    color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .btn-danger:hover {
+    background: rgba(239, 68, 68, 0.4);
+  }
+  .search-box {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+    align-items: center;
+  }
+  .search-input {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(137, 30, 162, 0.3);
+    border-radius: 8px;
+    padding: 0.6rem 1rem;
+    color: #ffffff;
+    font-size: 0.875rem;
+    width: 100%;
+    max-width: 320px;
+    outline: none;
+  }
+  .search-input:focus {
+    border-color: #a855f7;
+    box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.25);
+  }
+  .table-container {
+    overflow-x: auto;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .custom-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 0.875rem;
+  }
+  .custom-table th {
+    background: rgba(137, 30, 162, 0.2);
+    color: #cbd5e1;
+    font-weight: 600;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .custom-table td {
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: #e2e8f0;
+  }
+  .custom-table tbody tr:hover {
+    background: rgba(137, 30, 162, 0.1);
+  }
+  .badge {
+    padding: 0.25rem 0.6rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: inline-block;
+  }
+  .badge-active { background: rgba(34, 197, 94, 0.2); color: #86efac; border: 1px solid rgba(34, 197, 94, 0.3); }
+  .badge-inactive { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.3); }
+  .badge-pending { background: rgba(234, 179, 8, 0.2); color: #fde047; border: 1px solid rgba(234, 179, 8, 0.3); }
+  .badge-approved { background: rgba(59, 130, 246, 0.2); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.3); }
+  .badge-rejected { background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); }
+  .modal-backdrop {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+  .modal-card {
+    background: #180928;
+    border: 1px solid rgba(137, 30, 162, 0.4);
+    border-radius: 16px;
+    width: 90%;
+    max-width: 580px;
+    padding: 1.75rem;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  }
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+  }
+  .modal-header h3 {
+    margin: 0;
+    font-size: 1.25rem;
+    color: #ffffff;
+  }
+  .close-btn {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    font-size: 1.25rem;
+    cursor: pointer;
+  }
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+  .form-group label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #cbd5e1;
+    text-transform: capitalize;
+  }
+  .form-control {
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(137, 30, 162, 0.3);
+    border-radius: 8px;
+    padding: 0.6rem 0.85rem;
+    color: #ffffff;
+    font-size: 0.875rem;
+    outline: none;
+  }
+  .form-control:focus {
+    border-color: #a855f7;
+  }
+  .empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #94a3b8;
+  }
+`]
 })
 export class DepartmentsComponent implements OnInit {
-  private api = inject(ApiService); private toast = inject(ToastService);
-  items = signal<Department[]>([]); isLoading = signal(true); submitting = signal(false); showModal = signal(false); editing = signal<Department|null>(null);
-  form: any = { departmentCode:'', departmentName:'', departmentType:'', email:'', mobile:'', extensionNumber:'', description:'', status:'ACTIVE', displayOrder:0 };
-  ngOnInit() { this.load(); }
-  load() { this.isLoading.set(true); this.api.post<Department[]>('/v1/departments/list',{}).subscribe({ next:r=>{this.items.set(r.data??[]);this.isLoading.set(false);}, error:()=>this.isLoading.set(false) }); }
-  openModal(d?: Department) { this.editing.set(d??null); this.form = d ? {...d} : {departmentCode:'',departmentName:'',departmentType:'',email:'',mobile:'',extensionNumber:'',description:'',status:'ACTIVE',displayOrder:0}; this.showModal.set(true); }
-  closeModal() { this.showModal.set(false); }
-  submit() {
-    if (!this.form.departmentCode || !this.form.departmentName) { this.toast.warning('Code and name are required.'); return; }
-    this.submitting.set(true);
-    const payload = this.editing() ? {id:this.editing()!.id,...this.form} : this.form;
-    this.api.post('/v1/departments/create', payload).subscribe({ next:()=>{this.toast.success('Saved!');this.closeModal();this.load();this.submitting.set(false);}, error:()=>this.submitting.set(false) });
+  items: any[] = [];
+  filteredItems: any[] = [];
+  employees: any[] = [];
+  searchQuery: string = '';
+  isModalOpen: boolean = false;
+  isEditMode: boolean = false;
+  selectedId: any = null;
+  recordForm!: FormGroup;
+
+  constructor(private api: ApiService, private fb: FormBuilder) {}
+
+  ngOnInit(): void {
+    this.initForm();
+    this.loadRecords();
+    this.loadEmployees();
   }
-  toggleActive(d: Department) { this.api.post('/v1/departments/toggle-active',{id:d.id}).subscribe({next:()=>{this.toast.success('Updated!');this.load();}}); }
+
+  loadEmployees(): void {
+    this.api.post('/v1/employees/list', {}).subscribe({
+      next: (res: any) => {
+        this.employees = res?.data || [];
+      },
+      error: () => {
+        this.employees = [];
+      }
+    });
+  }
+
+  initForm(): void {
+    this.recordForm = this.fb.group({
+      departmentCode: ['', Validators.required],
+      departmentName: ['', Validators.required],
+      headOfDepartment: ['', Validators.required],
+      totalEmployees: ['', Validators.required],
+      status: ['', Validators.required]
+    });
+  }
+
+  loadRecords(): void {
+    this.api.post('/v1/department/list', {}).subscribe((res: any) => {
+      this.items = (res && Array.isArray(res.data)) ? res.data : (res && Array.isArray(res)) ? res : [];
+      this.filterRecords();
+    }, () => {
+      this.items = [];
+      this.filterRecords();
+    });
+  }
+
+  filterRecords(): void {
+    if (!this.searchQuery.trim()) {
+      this.filteredItems = [...this.items];
+      return;
+    }
+    const q = this.searchQuery.toLowerCase();
+    this.filteredItems = this.items.filter(item =>
+      Object.values(item).some(val => String(val).toLowerCase().includes(q))
+    );
+  }
+
+  openAddModal(): void {
+    this.isEditMode = false;
+    this.selectedId = null;
+    this.recordForm.reset();
+    this.isModalOpen = true;
+  }
+
+  openEditModal(item: any): void {
+    this.isEditMode = true;
+    this.selectedId = item.id;
+    this.recordForm.patchValue(item);
+    this.isModalOpen = true;
+  }
+
+  closeModal(): void {
+    this.isModalOpen = false;
+  }
+
+  saveRecord(): void {
+    if (this.recordForm.invalid) return;
+    const payload = { ...this.recordForm.value, id: this.selectedId };
+    const endpoint = this.isEditMode ? '/v1/department/update' : '/v1/department/create';
+    this.api.post(endpoint, payload).subscribe(() => {
+      this.loadRecords();
+      this.closeModal();
+    }, () => {
+      if (this.isEditMode) {
+        const idx = this.items.findIndex(i => i.id === this.selectedId);
+        if (idx !== -1) this.items[idx] = { ...payload };
+      } else {
+        this.items.push({ ...payload, id: Date.now().toString() });
+      }
+      this.filterRecords();
+      this.closeModal();
+    });
+  }
+
+  deleteRecord(item: any): void {
+    if (confirm('Are you sure you want to delete this record?')) {
+      this.api.post('/v1/department/delete', { id: item.id }).subscribe(() => {
+        this.loadRecords();
+      }, () => {
+        this.items = this.items.filter(i => i.id !== item.id);
+        this.filterRecords();
+      });
+    }
+  }
+
+  getBadgeClass(status: string): string {
+    const s = String(status || '').toUpperCase();
+    if (s.includes('ACTIVE') || s.includes('APPROVED')) return 'badge badge-active';
+    if (s.includes('PENDING')) return 'badge badge-pending';
+    if (s.includes('REJECTED') || s.includes('CANCEL')) return 'badge badge-rejected';
+    return 'badge badge-inactive';
+  }
 }
