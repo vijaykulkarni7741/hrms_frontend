@@ -24,7 +24,7 @@ import { LayoutService } from 'src/app/core/services/layout.service';
         <!-- Fixed Sticky Bottom Footer Bar -->
         <footer class="app-footer-bar">
           <div class="footer-center">
-            <span>HRMS Ver 2.5.07 | 2026 © Powered by Webic Soft India Pvt Ltd.</span>
+            <span>HRMS Ver 1.0.00 | 2026 © Powered by  Medimaze Solution Pvt Ltd.</span>
           </div>
         </footer>
       </div>
